@@ -1,0 +1,34 @@
+{
+  "form": {
+    "number": "Унифицированная форма № Т-13",
+    "okud": 301008
+  },
+  "workday_hours": 8,
+  "preholiday_hours": 7,
+  "director_label": "Директор  _________________",
+  "director_fio": "А.С.Ионов",
+  "approve_line": "Утверждаю              Директор филиала по  Заводскому району   Колесниченко Е.И.",
+  "hr_specialist_line": "Специалист ОК ________________ Порхунова Ж.М.",
+  "absence_codes": [
+    {
+      "code": "В",
+      "name": "Выходной/праздник",
+      "counts_as_absence": false
+    },
+    {
+      "code": "Б",
+      "name": "Больничный",
+      "counts_as_absence": true
+    },
+    {
+      "code": "ОТ",
+      "name": "Отпуск",
+      "counts_as_absence": true
+    },
+    {
+      "code": "ОЖ",
+      "name": "Отпуск по уходу за ребёнком",
+      "counts_as_absence": true
+    }
+  ]
+}

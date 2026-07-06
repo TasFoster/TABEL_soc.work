@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Живые данные приложения (персональные данные, НЕ публиковать) ---
+# Рабочие БД, бэкапы, логи, автосейв UI-состояния.
+tabel_app/data/app.db
+tabel_app/data/app.db.bak
+tabel_app/data/backups/
+tabel_app/data/logs/
+tabel_app/data/_app/
+**/data/app.db
+**/data/app.db.bak
+**/data/app.db-journal
+**/data/backups/
+**/data/logs/
+**/data/_app/
+
+# --- Крупные бинарные сборки (~290 МБ, собираются из исходников) ---
+Установщики/
+Сборки/
+Программа Табель/
+Программа Табель.zip
+*.exe
+
+# --- Веса нейросети (генерируются neuro/train.py) ---
+neuro/crnn.pt
+neuro/real/
+
+# --- PyInstaller / build мусор ---
+build/
+dist/
+*.spec.bak
+
+# --- ОС ---
+Thumbs.db
+desktop.ini
+.DS_Store

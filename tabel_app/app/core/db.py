@@ -140,6 +140,14 @@ CREATE TABLE IF NOT EXISTS reestr_kv (
     value TEXT
 );
 
+-- ---- Функция «Проверка качества»: телефоны клиентов (по ФИО) -----------
+-- В реестре телефонов нет; вводятся вручную и запоминаются, чтобы подставлять
+-- в следующий раз. Ключ — ФИО клиента (нормализовано по пробелам, регистр сохранён).
+CREATE TABLE IF NOT EXISTS pk_phones (
+    client_fio TEXT PRIMARY KEY,
+    phone      TEXT
+);
+
 -- ---- Архив сформированных документов (все функции) --------------------
 -- Копия каждого сгенерированного файла + параметры, чтобы открыть/пересохранить
 -- позже и (в будущем) переиспользовать настройки.
@@ -757,6 +765,41 @@ def employee_worker_fios():
         rows = conn.execute(
             "SELECT fio, position FROM employees ORDER BY sort_order, n, id").fetchall()
     return [r["fio"] for r in rows if "работник" in (r["position"] or "").lower()]
+
+
+# =================================== телефоны клиентов «Проверки качества»
+def _pk_key(fio):
+    """Ключ телефона: нормализуем только пробелы, регистр сохраняем (в отличие от
+    _norm_fio, который приводит к нижнему регистру — тут ФИО должно остаться читаемым)."""
+    return " ".join(str(fio or "").split())
+
+
+def pk_phone_load(client_fio):
+    ensure_seeded()
+    with get_conn() as conn:
+        r = conn.execute("SELECT phone FROM pk_phones WHERE client_fio=?",
+                         (_pk_key(client_fio),)).fetchone()
+    return r["phone"] if r and r["phone"] else ""
+
+
+def pk_phone_save(client_fio, phone):
+    key = _pk_key(client_fio)
+    if not key:
+        return
+    ensure_seeded()
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO pk_phones(client_fio, phone) VALUES(?,?) "
+            "ON CONFLICT(client_fio) DO UPDATE SET phone=excluded.phone",
+            (key, (phone or "").strip()))
+        conn.commit()
+
+
+def pk_phones_load_all():
+    ensure_seeded()
+    with get_conn() as conn:
+        rows = conn.execute("SELECT client_fio, phone FROM pk_phones").fetchall()
+    return {r["client_fio"]: r["phone"] for r in rows}
 
 
 # ======================================================= архив документов

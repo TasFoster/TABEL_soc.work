@@ -75,9 +75,17 @@ def _add_gos_zadanie(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_gos_zadanie))
 
 
+def _add_proverka_kachestva(features):
+    from .proverka_kachestva import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
+    from .proverka_kachestva.gui import open_proverka_kachestva
+    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION,
+                            open_proverka_kachestva))
+
+
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
 _REGISTRARS = (_add_timesheet, _add_reestr, _add_prilozhenie, _add_proezd,
-               _add_uslugi_dengi, _add_grafiki, _add_protokol, _add_gos_zadanie)
+               _add_uslugi_dengi, _add_grafiki, _add_protokol, _add_gos_zadanie,
+               _add_proverka_kachestva)
 
 
 def get_features():

@@ -218,6 +218,43 @@ def _selftest_gos():
             f.write(traceback.format_exc())
 
 
+def _selftest_pk():
+    """Самопроверка «Проверка качества»: реестр .xls -> .ods (все четверги месяца).
+    Путь к реестру передаётся следующим аргументом после --selftest-pk."""
+    import datetime
+    import traceback
+
+    base = _base_dir()
+    log = os.path.join(base, "selftest_pk_result.txt")
+    try:
+        idx = sys.argv.index("--selftest-pk")
+        src = sys.argv[idx + 1]
+        from app.features.proverka_kachestva import service
+
+        wc = service.parse_workers_clients(src)
+        if not wc["order"]:
+            raise RuntimeError("в реестре не найдено ни одного соцработника")
+        today = datetime.date.today()
+        thus = service.month_thursdays(today.year, today.month)
+        rows = []
+        for worker in wc["order"][:3]:
+            for j, (client, addr) in enumerate(wc["by_worker"][worker][:3]):
+                d = thus[j % len(thus)] if thus else today
+                rows.append({"date": service.format_date(d), "worker": worker,
+                             "client": client, "address": addr, "phone": "", "result": "нет"})
+        ctx = {"title": service.default_title("9"),
+               "sign": service.default_sign("9", "Шершнева Т.И."),
+               "dept_no": "9", "zav": "Шершнева Т.И."}
+        out = os.path.join(base, "selftest_pk.ods")
+        service.generate(out, ctx, rows)
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(f"OK {out}\nсоцработников={len(wc['order'])} "
+                    f"строк={len(rows)} четвергов={len(thus)}")
+    except Exception:
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+
+
 if __name__ == "__main__":
     try:
         from app.core import logging_setup
@@ -238,6 +275,8 @@ if __name__ == "__main__":
         _selftest_protokol()
     elif "--selftest-gos" in sys.argv:
         _selftest_gos()
+    elif "--selftest-pk" in sys.argv:
+        _selftest_pk()
     else:
         _create_app_mutex()
         from app.shell import run

@@ -44,7 +44,6 @@ $re = 'app/features/reestr'
 $pr = 'app/features/prilozhenie'
 $pz = 'app/features/proezd'
 $ud = 'app/features/uslugi_dengi'
-$pt = 'app/features/protokol'
 $gz = 'app/features/gos_zadanie'
 
 # Common args + data for the 3 always-present features.
@@ -59,7 +58,6 @@ $common = @(
   '--add-data', "$re/data/grouping_seed.json;features/reestr/data",
   '--add-data', "$pr/data/loads_seed.json;features/prilozhenie/data",
   '--add-data', "$ud/templates/uslugi_dengi_template.xlsx;features/uslugi_dengi/templates",
-  '--add-data', "$pt/data/plan.json;features/protokol/data",
   '--add-data', "$gz/data/services_seed.json;features/gos_zadanie/data",
   '--hidden-import', 'xlrd', '--hidden-import', 'sqlite3',
   '--collect-submodules', 'xlwt', '--collect-submodules', 'odf',

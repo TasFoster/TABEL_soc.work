@@ -166,34 +166,6 @@ def _selftest_uslugi():
             f.write(traceback.format_exc())
 
 
-def _selftest_protokol():
-    """Самопроверка «Протокол»: реквизиты + соцработники из БД -> .odt."""
-    import datetime
-    import traceback
-
-    base = _base_dir()
-    log = os.path.join(base, "selftest_protokol_result.txt")
-    try:
-        from app.features.protokol import service, storage
-
-        depts = storage.list_departments()
-        dept = depts[0]
-        people = storage.soc_workers(dept["id"])
-        attendees = people[:-1] if len(people) > 1 else people
-        absentees = people[-1:] if len(people) > 1 else []
-        today = datetime.date.today()
-        d = service.last_working_wednesday(today.year, today.month)
-        out = os.path.join(base, "selftest_protokol.odt")
-        service.generate(out, "1", service.format_date(d), attendees,
-                         service.default_body(today.month), absentees=absentees)
-        with open(log, "w", encoding="utf-8") as f:
-            f.write(f"OK {out}\nдата(последняя раб. среда)={service.format_date(d)} "
-                    f"присутств={len(attendees)} отсутств={len(absentees)}")
-    except Exception:
-        with open(log, "w", encoding="utf-8") as f:
-            f.write(traceback.format_exc())
-
-
 def _selftest_gos():
     """Самопроверка «Отчёт по госзаданию»: из файла-источника -> .ods.
     Путь к файлу передаётся следующим аргументом после --selftest-gos."""
@@ -314,8 +286,6 @@ if __name__ == "__main__":
         _selftest_proezd()
     elif "--selftest-uslugi" in sys.argv:
         _selftest_uslugi()
-    elif "--selftest-protokol" in sys.argv:
-        _selftest_protokol()
     elif "--selftest-gos" in sys.argv:
         _selftest_gos()
     elif "--selftest-pk" in sys.argv:

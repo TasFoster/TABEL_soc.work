@@ -13,7 +13,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from .core import ui_state, updater_gui
-from .core.clipboard import enable_cyrillic_clipboard
+from .core.clipboard import enable_hotkeys
 from .core.documents_gui import open_documents
 from .features.registry import get_features
 from .reference_gui import open_reference
@@ -31,7 +31,7 @@ class Shell(ctk.CTk):
         self.geometry("640x560")
         self.minsize(560, 440)
         # Копирование/вставка на русской раскладке (для всех окон программы).
-        enable_cyrillic_clipboard(self)
+        enable_hotkeys(self)
         # Ошибки колбэков Tkinter — в лог-файл (data/logs/app.log).
         self.report_callback_exception = self._log_callback_error
 

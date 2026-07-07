@@ -18,7 +18,6 @@ FEATURE_TITLES = {
     "proezd": "Проезд",
     "uslugi_dengi": "Услуги-Деньги",
     "grafiki": "График проверок",
-    "protokol": "Протокол",
     "gos_zadanie": "Отчёт по госзаданию",
     "proverka_kachestva": "Проверка качества",
     "peresmotr": "Пересмотр",

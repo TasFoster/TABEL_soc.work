@@ -33,12 +33,6 @@ def _add_timesheet(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_timesheet))
 
 
-def _add_reestr(features):
-    from .reestr import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
-    from .reestr.gui import open_reestr
-    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_reestr))
-
-
 def _add_prilozhenie(features):
     from .prilozhenie import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
     from .prilozhenie.gui import open_prilozhenie
@@ -63,12 +57,6 @@ def _add_grafiki(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_grafiki))
 
 
-def _add_protokol(features):
-    from .protokol import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
-    from .protokol.gui import open_protokol
-    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_protokol))
-
-
 def _add_gos_zadanie(features):
     from .gos_zadanie import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
     from .gos_zadanie.gui import open_gos_zadanie
@@ -89,8 +77,10 @@ def _add_peresmotr(features):
 
 
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
-_REGISTRARS = (_add_timesheet, _add_reestr, _add_prilozhenie, _add_proezd,
-               _add_uslugi_dengi, _add_grafiki, _add_protokol, _add_gos_zadanie,
+# «Протокол» удалён; старый «Реестр» убран из меню (общие модули пакета reestr
+# и редактор клиентов ClientsManager остаются) — его заменит «Реестр по оплате».
+_REGISTRARS = (_add_timesheet, _add_prilozhenie, _add_proezd,
+               _add_uslugi_dengi, _add_grafiki, _add_gos_zadanie,
                _add_proverka_kachestva, _add_peresmotr)
 
 

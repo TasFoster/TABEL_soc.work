@@ -283,6 +283,21 @@ def _selftest_peresmotr():
             f.write(traceback.format_exc())
 
 
+def _selftest_ocr():
+    """Диагностика: доступен ли офлайн-OCR (winrt + cv2) в этой сборке (для .exe)."""
+    base = _base_dir()
+    log = os.path.join(base, "selftest_ocr_result.txt")
+    try:
+        from app.features.proezd import parser
+        ok = parser.ocr_available()
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(f"OCR_AVAILABLE={ok}")
+    except Exception:
+        import traceback
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+
+
 if __name__ == "__main__":
     try:
         from app.core import logging_setup
@@ -307,6 +322,8 @@ if __name__ == "__main__":
         _selftest_pk()
     elif "--selftest-peresmotr" in sys.argv:
         _selftest_peresmotr()
+    elif "--selftest-ocr" in sys.argv:
+        _selftest_ocr()
     else:
         _create_app_mutex()
         from app.shell import run

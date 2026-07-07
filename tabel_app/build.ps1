@@ -77,9 +77,13 @@ if ($Variant -eq 'lite') {
     'main.py'
   )
 } else {
-  # Full: all 4 features incl. Proezd; collect the whole app package and OCR deps.
+  # Full: all features incl. Proezd; collect the whole app package and OCR deps.
+  # winrt (Windows OCR projections) is lazily imported inside functions, so PyInstaller
+  # does not auto-detect it -> collect it explicitly (native runtime + winrt.windows.*).
+  # cv2/numpy are picked up by their PyInstaller hooks via import detection.
   $pyiArgs = $common + @(
     '--collect-submodules', 'app',
+    '--collect-all', 'winrt',
     '--add-data', "$pz/templates/proezd_template.ods;features/proezd/templates",
     '--add-data', "$pz/data/settings.json;features/proezd/data",
     'main.py'

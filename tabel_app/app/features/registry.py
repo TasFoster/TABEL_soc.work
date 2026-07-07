@@ -82,10 +82,16 @@ def _add_proverka_kachestva(features):
                             open_proverka_kachestva))
 
 
+def _add_peresmotr(features):
+    from .peresmotr import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
+    from .peresmotr.gui import open_peresmotr
+    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_peresmotr))
+
+
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
 _REGISTRARS = (_add_timesheet, _add_reestr, _add_prilozhenie, _add_proezd,
                _add_uslugi_dengi, _add_grafiki, _add_protokol, _add_gos_zadanie,
-               _add_proverka_kachestva)
+               _add_proverka_kachestva, _add_peresmotr)
 
 
 def get_features():

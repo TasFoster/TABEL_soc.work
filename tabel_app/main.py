@@ -255,6 +255,34 @@ def _selftest_pk():
             f.write(traceback.format_exc())
 
 
+def _selftest_peresmotr():
+    """Самопроверка «Пересмотр»: отчёт ИПСУ -> список с окончанием срока -> .ods.
+    Путь к отчёту ИПСУ передаётся следующим аргументом после --selftest-peresmotr."""
+    import traceback
+
+    base = _base_dir()
+    log = os.path.join(base, "selftest_peresmotr_result.txt")
+    try:
+        idx = sys.argv.index("--selftest-peresmotr")
+        src = sys.argv[idx + 1]
+        from app.features.peresmotr import service
+
+        # период — из последней даты окончания в отчёте (чтобы точно что-то нашлось)
+        recs = service.reestr_parser.parse_ipsu(src)
+        ends = [service.end_date(r.srok) for r in recs]
+        ends = [e for e in ends if e]
+        y, m = (ends[0].year, ends[0].month) if ends else (2026, 5)
+        rows = service.find_expiring(src, y, m)
+        ctx = {"title": service.default_title(y, m)}
+        out = os.path.join(base, "selftest_peresmotr.ods")
+        service.generate(out, ctx, rows)
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(f"OK {out}\nпериод={m:02d}.{y} записей={len(rows)} всего_ИПСУ={len(recs)}")
+    except Exception:
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+
+
 if __name__ == "__main__":
     try:
         from app.core import logging_setup
@@ -277,6 +305,8 @@ if __name__ == "__main__":
         _selftest_gos()
     elif "--selftest-pk" in sys.argv:
         _selftest_pk()
+    elif "--selftest-peresmotr" in sys.argv:
+        _selftest_peresmotr()
     else:
         _create_app_mutex()
         from app.shell import run

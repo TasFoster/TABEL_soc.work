@@ -21,6 +21,7 @@ FEATURE_TITLES = {
     "protokol": "Протокол",
     "gos_zadanie": "Отчёт по госзаданию",
     "proverka_kachestva": "Проверка качества",
+    "peresmotr": "Пересмотр",
 }
 
 

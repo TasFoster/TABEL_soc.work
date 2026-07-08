@@ -39,6 +39,12 @@ def _add_prilozhenie(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_prilozhenie))
 
 
+def _add_reestr_oplata(features):
+    from .reestr_oplata import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
+    from .reestr_oplata.gui import open_reestr_oplata
+    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_reestr_oplata))
+
+
 def _add_proezd(features):
     from .proezd import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
     from .proezd.gui import open_proezd
@@ -78,8 +84,8 @@ def _add_peresmotr(features):
 
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
 # «Протокол» удалён; старый «Реестр» убран из меню (общие модули пакета reestr
-# и редактор клиентов ClientsManager остаются) — его заменит «Реестр по оплате».
-_REGISTRARS = (_add_timesheet, _add_prilozhenie, _add_proezd,
+# и редактор клиентов ClientsManager остаются) — его заменил «Реестр по оплате».
+_REGISTRARS = (_add_timesheet, _add_prilozhenie, _add_reestr_oplata, _add_proezd,
                _add_uslugi_dengi, _add_grafiki, _add_gos_zadanie,
                _add_proverka_kachestva, _add_peresmotr)
 

@@ -36,6 +36,13 @@ build/
 dist/
 *.spec.bak
 
+# --- Выводы self-test (артефакты проверки, создаются рядом с программой) ---
+tabel_app/selftest_*
+selftest_*
+
+# --- Случайные загрузки, не относящиеся к проекту ---
+*.msi
+
 # --- ОС ---
 Thumbs.db
 desktop.ini

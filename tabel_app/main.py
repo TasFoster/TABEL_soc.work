@@ -255,6 +255,34 @@ def _selftest_peresmotr():
             f.write(traceback.format_exc())
 
 
+def _selftest_reestr_oplata():
+    """Самопроверка «Реестр по оплате»: реестр .ods + журнал .xls -> правка -> .ods.
+    Аргументы после --selftest-reestr-oplata: <реестр.ods> <журнал.xls>."""
+    import traceback
+
+    base = _base_dir()
+    log = os.path.join(base, "selftest_reestr_oplata_result.txt")
+    try:
+        idx = sys.argv.index("--selftest-reestr-oplata")
+        ods_src, jrn_src = sys.argv[idx + 1], sys.argv[idx + 2]
+        from app.features.reestr_oplata import service, ods_editor as ed
+
+        model, journal, plan = service.analyze(ods_src, jrn_src)
+        # новым клиентам назначаем первого соцработника (для самопроверки)
+        if model.gos_blocks:
+            for ch in plan.by_category(service.CAT_NEW):
+                ch.worker = model.gos_blocks[0].worker_fio
+        service.apply_plan(model, plan, journal)
+        out = os.path.join(base, "selftest_reestr_oplata.ods")
+        ed.save(model, out)
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(f"OK {out}\nпериод={journal['period']} блоков={len(model.gos_blocks)} "
+                    f"изменений={len(plan.changes)} применено={len(plan.selected)}")
+    except Exception:
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+
+
 def _selftest_ocr():
     """Диагностика: доступен ли офлайн-OCR (winrt + cv2) в этой сборке (для .exe)."""
     base = _base_dir()
@@ -292,6 +320,8 @@ if __name__ == "__main__":
         _selftest_pk()
     elif "--selftest-peresmotr" in sys.argv:
         _selftest_peresmotr()
+    elif "--selftest-reestr-oplata" in sys.argv:
+        _selftest_reestr_oplata()
     elif "--selftest-ocr" in sys.argv:
         _selftest_ocr()
     else:

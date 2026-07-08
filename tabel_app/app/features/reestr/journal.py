@@ -10,7 +10,7 @@ import re
 
 import xlrd
 
-from .parser import extract_contract, split_fio
+from .parser import _num, extract_contract, split_fio
 
 _NORM_RE = re.compile(r"[^а-яёa-z0-9 ]")
 
@@ -99,6 +99,55 @@ def parse_journal(path):
         rec = by_fio.setdefault(key, {"gos": set(), "dop": set(), "fio": split_fio(full)[0]})
         if number:
             rec[kind].add(number)
+    return {"period": period, "by_fio": by_fio}
+
+
+def parse_journal_detailed(path):
+    """Как parse_journal, но с суммами за месяц по каждому договору.
+
+    Вернуть {'period':(start,end),
+             'by_fio': {norm_fio: {'fio': исходное ФИО (без даты рожд.),
+                                   'gos': {номер: сумма_за_месяц, ...},
+                                   'dop': {номер: сумма_за_месяц, ...}}}}.
+    Используется функцией «Реестр по оплате» (правка готового .ods по отчёту).
+    """
+    book = xlrd.open_workbook(path)
+    sheet = book.sheet_by_index(0)
+
+    period = ("", "")
+    for r in range(min(sheet.nrows, 12)):
+        for c in range(sheet.ncols):
+            m = re.search(r"с\s*(\d{2}\.\d{2}\.\d{4})\s*по\s*(\d{2}\.\d{2}\.\d{4})",
+                          _s(sheet.cell(r, c).value))
+            if m:
+                period = (m.group(1), m.group(2))
+                break
+        if period[0]:
+            break
+
+    hr = _find_header(sheet)
+    if hr < 0:
+        return {"period": period, "by_fio": {}}
+    cm = _colmap(sheet, hr)
+    c_fio = cm.get("fio", 3)
+    c_type = cm.get("type")
+    c_num = cm.get("number")
+    c_sum = cm.get("sum_month")
+
+    by_fio = {}
+    for r in range(hr + 1, sheet.nrows):
+        full = _s(sheet.cell(r, c_fio).value) if c_fio is not None else ""
+        if not full or not re.search(r"[А-Яа-яЁё]{2,}", full):
+            continue
+        key = norm_fio(full)
+        if not key:
+            continue
+        kind = _kind(_s(sheet.cell(r, c_type).value)) if c_type is not None else "gos"
+        number = extract_contract(_s(sheet.cell(r, c_num).value)) if c_num is not None else ""
+        summa = _num(sheet.cell(r, c_sum).value) if c_sum is not None else 0.0
+        rec = by_fio.setdefault(key, {"fio": split_fio(full)[0], "gos": {}, "dop": {}})
+        if number:
+            rec[kind][number] = summa
     return {"period": period, "by_fio": by_fio}
 
 

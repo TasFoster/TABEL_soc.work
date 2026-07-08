@@ -82,12 +82,18 @@ def _add_peresmotr(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_peresmotr))
 
 
+def _add_plany(features):
+    from .plany import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
+    from .plany.gui import open_plany
+    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_plany))
+
+
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
 # «Протокол» удалён; старый «Реестр» убран из меню (общие модули пакета reestr
 # и редактор клиентов ClientsManager остаются) — его заменил «Реестр по оплате».
 _REGISTRARS = (_add_timesheet, _add_prilozhenie, _add_reestr_oplata, _add_proezd,
                _add_uslugi_dengi, _add_grafiki, _add_gos_zadanie,
-               _add_proverka_kachestva, _add_peresmotr)
+               _add_proverka_kachestva, _add_peresmotr, _add_plany)
 
 
 def get_features():

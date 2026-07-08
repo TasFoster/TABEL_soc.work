@@ -23,3 +23,8 @@ def save_phone(client_fio, phone):
 def load_all_phones():
     """Все сохранённые телефоны как {ФИО: телефон}."""
     return _db.pk_phones_load_all()
+
+
+def delete_phone(client_fio):
+    """Удалить сохранённый телефон клиента."""
+    _db.pk_phone_delete(client_fio)

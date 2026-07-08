@@ -14,8 +14,8 @@ class ReferenceWindow(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title("Справочники")
-        self.geometry("440x340")
-        self.minsize(380, 300)
+        self.geometry("440x380")
+        self.minsize(380, 340)
         self.transient(master)
         self._build()
 
@@ -27,6 +27,7 @@ class ReferenceWindow(tk.Toplevel):
             ("Производственный календарь", self._open_calendar),
             ("Реквизиты и подписи", self._open_settings),
             ("Клиенты и группы (Реестр)", self._open_clients),
+            ("Телефоны клиентов (Проверка качества)", self._open_pk_phones),
             ("Экспорт / импорт данных…", self._transfer),
         ]
         for text, cmd in items:
@@ -67,6 +68,12 @@ class ReferenceWindow(tk.Toplevel):
         def make():
             from .features.reestr.gui import ClientsManager
             return ClientsManager(self)
+        self._run(make)
+
+    def _open_pk_phones(self):
+        def make():
+            from .features.proverka_kachestva.gui import PhonesManager
+            return PhonesManager(self)
         self._run(make)
 
     def _transfer(self):

@@ -283,6 +283,45 @@ def _selftest_reestr_oplata():
             f.write(traceback.format_exc())
 
 
+def _selftest_plany():
+    """Самопроверка «Планы»: шаблон месяца -> сдвиг года + соцработник -> .odt.
+    Необязательные аргументы после --selftest-plany: <отд> <месяц> <год>."""
+    import traceback
+
+    base = _base_dir()
+    log = os.path.join(base, "selftest_plany_result.txt")
+    try:
+        idx = sys.argv.index("--selftest-plany")
+        args = sys.argv[idx + 1:idx + 4]
+        dept = args[0] if len(args) >= 1 else "9"
+        month = int(args[1]) if len(args) >= 2 else 1
+        year = int(args[2]) if len(args) >= 3 else 2027
+        from app.features.plany import service, storage
+
+        out = os.path.join(base, "selftest_plany.odt")
+        service.generate(out, dept, month, year)
+        plan = service.build_plan(dept, month, year)
+        nrows = sum(len(s["rows"]) for s in plan["sections"])
+        # быстрая проверка всех 12 месяцев обоих отделений (без записи)
+        bad = []
+        for d in storage.departments():
+            for m in range(1, 13):
+                try:
+                    p = service.build_plan(d, m, year)
+                    if not p["sections"]:
+                        bad.append("отд%s м%d пусто" % (d, m))
+                except Exception as e:  # noqa: BLE001
+                    bad.append("отд%s м%d: %s" % (d, m, e))
+        with open(log, "w", encoding="utf-8") as f:
+            f.write("OK %s\nотд=%s месяц=%d год=%d разделов=%d строк=%d соцработник=%r\n"
+                    % (out, dept, month, year, len(plan["sections"]), nrows,
+                       service.effective_worker(dept, year, month)))
+            f.write("проблемные месяцы: %s" % (bad or "нет"))
+    except Exception:
+        with open(log, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+
+
 def _selftest_ocr():
     """Диагностика: доступен ли офлайн-OCR (winrt + cv2) в этой сборке (для .exe)."""
     base = _base_dir()
@@ -322,6 +361,8 @@ if __name__ == "__main__":
         _selftest_peresmotr()
     elif "--selftest-reestr-oplata" in sys.argv:
         _selftest_reestr_oplata()
+    elif "--selftest-plany" in sys.argv:
+        _selftest_plany()
     elif "--selftest-ocr" in sys.argv:
         _selftest_ocr()
     else:

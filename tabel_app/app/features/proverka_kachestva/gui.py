@@ -284,7 +284,11 @@ class ProverkaKachestvaWindow(tk.Toplevel):
             if ed._done:
                 return
             ed._done = True
-            self._rows[int(rowid)][key] = ed.get().strip()
+            row = self._rows[int(rowid)]
+            row[key] = ed.get().strip()
+            # при ручном вводе/правке ФИО клиента подтянуть сохранённый телефон
+            if key == "client" and row[key] and not row.get("phone"):
+                row["phone"] = storage.load_phone(row[key]) or ""
             ed.destroy()
             self._refresh_tree()
 
@@ -337,6 +341,109 @@ class ProverkaKachestvaWindow(tk.Toplevel):
                 os.startfile(out)
             except Exception:  # noqa: BLE001
                 pass
+
+
+class PhonesManager(tk.Toplevel):
+    """Редактор сохранённых телефонов клиентов (для «Справочников»).
+
+    Телефоны вводятся вручную в «Проверке качества» и запоминаются по ФИО (в реестре
+    их нет). Здесь их можно посмотреть, поправить, удалить или добавить заранее."""
+
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.title("Телефоны клиентов (Проверка качества)")
+        self.geometry("560x460")
+        self.minsize(460, 360)
+        self.transient(master)
+        self._build()
+        self._reload()
+
+    def _build(self):
+        ttk.Label(self, wraplength=530, foreground="#555", justify="left",
+                  text=("Телефоны запоминаются по ФИО клиента и подставляются при следующем "
+                        "формировании листа проверки качества. Двойной клик — изменить.")
+                  ).pack(fill="x", padx=12, pady=(10, 6))
+        frm = ttk.Frame(self)
+        frm.pack(fill="both", expand=True, padx=12)
+        self.tree = ttk.Treeview(frm, columns=("fio", "phone"), show="headings",
+                                 selectmode="browse")
+        self.tree.heading("fio", text="ФИО клиента")
+        self.tree.heading("phone", text="Телефон")
+        self.tree.column("fio", width=340, anchor="w")
+        self.tree.column("phone", width=150, anchor="w")
+        sb = ttk.Scrollbar(frm, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.tree.pack(side="left", fill="both", expand=True)
+        self.tree.bind("<Double-1>", self._edit)
+
+        btns = ttk.Frame(self)
+        btns.pack(fill="x", padx=12, pady=8)
+        ttk.Button(btns, text="Добавить", command=self._add).pack(side="left")
+        ttk.Button(btns, text="Удалить", command=self._delete).pack(side="left", padx=6)
+        ttk.Button(btns, text="Закрыть", command=self.destroy).pack(side="right")
+
+    def _reload(self):
+        self.tree.delete(*self.tree.get_children())
+        for fio, phone in sorted(storage.load_all_phones().items()):
+            self.tree.insert("", "end", values=(fio, phone))
+
+    def _edit(self, event):
+        if self.tree.identify("region", event.x, event.y) != "cell":
+            return
+        rowid = self.tree.identify_row(event.y)
+        colid = self.tree.identify_column(event.x)
+        if not rowid:
+            return
+        col = "fio" if colid == "#1" else "phone"
+        bbox = self.tree.bbox(rowid, colid)
+        if not bbox:
+            return
+        x, y, w, h = bbox
+        old_fio = self.tree.set(rowid, "fio")
+        old_phone = self.tree.set(rowid, "phone")
+        ed = ttk.Entry(self)
+        ed.place(in_=self.tree, x=x, y=y, width=w, height=h)
+        ed.insert(0, self.tree.set(rowid, col))
+        ed.focus_set()
+        ed._done = False
+
+        def commit(_=None):
+            if ed._done:
+                return
+            ed._done = True
+            val = ed.get().strip()
+            ed.destroy()
+            if col == "phone":
+                storage.save_phone(old_fio, val)
+            else:  # переименование ФИО = перенос телефона на новый ключ
+                if val and val != old_fio:
+                    storage.delete_phone(old_fio)
+                    storage.save_phone(val, old_phone)
+            self._reload()
+
+        ed.bind("<Return>", commit)
+        ed.bind("<FocusOut>", commit)
+        ed.bind("<Escape>", lambda e: (setattr(ed, "_done", True), ed.destroy()))
+
+    def _add(self):
+        from tkinter import simpledialog
+        fio = simpledialog.askstring("Новый клиент", "ФИО клиента:", parent=self)
+        if not fio or not fio.strip():
+            return
+        phone = simpledialog.askstring("Телефон", "Телефон:", parent=self) or ""
+        storage.save_phone(fio.strip(), phone.strip())
+        self._reload()
+
+    def _delete(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo("Не выбрано", "Выделите строку.", parent=self)
+            return
+        fio = self.tree.set(sel[0], "fio")
+        if messagebox.askyesno("Удаление", f"Удалить телефон клиента «{fio}»?", parent=self):
+            storage.delete_phone(fio)
+            self._reload()
 
 
 def open_proverka_kachestva(master):

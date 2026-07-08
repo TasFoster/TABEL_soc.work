@@ -148,6 +148,18 @@ CREATE TABLE IF NOT EXISTS pk_phones (
     phone      TEXT
 );
 
+-- ---- Функция «Планы»: соцработник «Заслушивания» по (отд, год, месяц) --------
+-- План задач фиксирован; из года в год меняется только год в датах и соцработник,
+-- чей отчёт заслушивается. Здесь запоминаем выбранного соцработника, чтобы не
+-- вводить заново; ключ — отделение + год + месяц. Пусто => берётся из шаблона.
+CREATE TABLE IF NOT EXISTS plany_workers (
+    dept   TEXT,
+    year   INTEGER,
+    month  INTEGER,
+    worker TEXT,
+    PRIMARY KEY (dept, year, month)
+);
+
 -- ---- Архив сформированных документов (все функции) --------------------
 -- Копия каждого сгенерированного файла + параметры, чтобы открыть/пересохранить
 -- позже и (в будущем) переиспользовать настройки.
@@ -798,8 +810,46 @@ def pk_phone_save(client_fio, phone):
 def pk_phones_load_all():
     ensure_seeded()
     with get_conn() as conn:
-        rows = conn.execute("SELECT client_fio, phone FROM pk_phones").fetchall()
+        rows = conn.execute("SELECT client_fio, phone FROM pk_phones ORDER BY client_fio").fetchall()
     return {r["client_fio"]: r["phone"] for r in rows}
+
+
+def pk_phone_delete(client_fio):
+    ensure_seeded()
+    with get_conn() as conn:
+        conn.execute("DELETE FROM pk_phones WHERE client_fio=?", (_pk_key(client_fio),))
+        conn.commit()
+
+
+# =================================== соцработники «Заслушивания» функции «Планы»
+def plany_worker_load(dept, year, month):
+    """Сохранённый соцработник для (отд, год, месяц) или '' если не задан."""
+    ensure_seeded()
+    with get_conn() as conn:
+        r = conn.execute(
+            "SELECT worker FROM plany_workers WHERE dept=? AND year=? AND month=?",
+            (str(dept), int(year), int(month))).fetchone()
+    return r["worker"] if r and r["worker"] else ""
+
+
+def plany_worker_save(dept, year, month, worker):
+    ensure_seeded()
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO plany_workers(dept, year, month, worker) VALUES(?,?,?,?) "
+            "ON CONFLICT(dept, year, month) DO UPDATE SET worker=excluded.worker",
+            (str(dept), int(year), int(month), (worker or "").strip()))
+        conn.commit()
+
+
+def plany_workers_load_all(dept, year):
+    """Все заданные соцработники за год как {месяц: соцработник}."""
+    ensure_seeded()
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT month, worker FROM plany_workers WHERE dept=? AND year=?",
+            (str(dept), int(year))).fetchall()
+    return {int(r["month"]): r["worker"] for r in rows if r["worker"]}
 
 
 # ======================================================= архив документов

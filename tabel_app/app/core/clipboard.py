@@ -1,39 +1,47 @@
 """Глобальные горячие клавиши редактирования во всех окнах приложения.
 
-Что обеспечивается на ОБЕИХ раскладках (латинской и русской ЙЦУКЕН):
-  • Копировать / Вставить / Вырезать (Ctrl+C/V/X, Ctrl+С/М/Ч);
-  • Выделить всё (Ctrl+A / Ctrl+Ф);
-  • Отменить / Повторить (Ctrl+Z/Y, Ctrl+Я/Н).
+Работают на ЛЮБОЙ раскладке (латиница, русская ЙЦУКЕН и др.):
+  • Копировать / Вставить / Вырезать — Ctrl+C / Ctrl+V / Ctrl+X;
+  • Выделить всё — Ctrl+A;
+  • Отменить / Повторить — Ctrl+Z / Ctrl+Y.
 
-Почему нужен отдельный модуль:
-  - На русской раскладке Ctrl+C даёт keysym `Cyrillic_es`, а штатные привязки Tkinter
-    ждут латинский `c` — поэтому буфер обмена «не работает». Лечится добавлением
-    кириллических сочетаний к виртуальным событиям `<<Copy>>` и т.п. (`event_add`
-    действует на весь интерпретатор Tk → покрывает все окна, включая Toplevel фич).
-  - Отмены/повтора в Tkinter НЕТ: у `tk.Entry`/`ttk.Combobox` её нет вовсе, а `tk.Text`
-    требует `undo=True`. Поэтому: для полей ввода ведём свой стек истории (снимок
-    значения на каждое нажатие), а всем `Text` включаем родную отмену при фокусе.
+Почему клавиша определяется по КОДУ (keycode), а не по СИМВОЛУ (keysym):
+  На латинице всё уже работает штатно: Tk по умолчанию привязывает Ctrl+C/V/X/A/Z/Y к
+  виртуальным событиям <<Copy>>/<<Paste>>/<<Cut>>/<<SelectAll>>/<<Undo>>/<<Redo>>.
+  Но на русской раскладке Ctrl+C даёт keysym не `c`, а кириллический символ (и, в
+  зависимости от сборки Tk/Windows, РАЗНЫЙ) — эти виртуальные события не срабатывают,
+  и «горячие клавиши не работают». `keycode` же одинаков независимо от раскладки (это
+  физическая клавиша), поэтому мы ловим Ctrl+<любая раскладка> одним обработчиком
+  `<Control-KeyPress>` и диспетчеризуем по keycode — но ТОЛЬКО когда keysym НЕ латинский
+  (иначе штатный механизм уже отработал, и было бы двойное действие).
 
-Вызывается один раз при запуске — `enable_hotkeys(root)` в `shell.py`.
+Отмена/повтор: у tk.Entry/ttk-полей своей истории нет — ведём стек снимков значения
+(и на латинице привязываем его к штатным <<Undo>>/<<Redo>>, а на прочих раскладках —
+через keycode); у tk.Text включаем родную отмену (undo=True) при фокусе.
+
+Вызывается один раз при запуске — enable_hotkeys(root) в shell.py.
 """
 
 import tkinter as tk
 
-# Виртуальное событие -> Control-<keysym> для латинской И кириллической раскладок.
-# Кириллические keysym соответствуют физическим клавишам C/V/X/A/Z/Y раскладки ЙЦУКЕН
-# (с/м/ч/ф/я/н).
-_MAP = {
-    "<<Copy>>":      ("c", "C", "Cyrillic_es",  "Cyrillic_ES"),
-    "<<Paste>>":     ("v", "V", "Cyrillic_em",  "Cyrillic_EM"),
-    "<<Cut>>":       ("x", "X", "Cyrillic_che", "Cyrillic_CHE"),
-    "<<SelectAll>>": ("a", "A", "Cyrillic_ef",  "Cyrillic_EF"),
-    "<<Undo>>":      ("z", "Z", "Cyrillic_ya",  "Cyrillic_YA"),
-    "<<Redo>>":      ("y", "Y", "Cyrillic_en",  "Cyrillic_EN"),
+# Логическое действие -> (латинские keysym'ы клавиши, её keycode на Windows).
+# keysym нужен, чтобы на латинице НЕ дублировать штатные copy/paste/cut;
+# keycode — универсальный распознаватель клавиши для ЛЮБОЙ раскладки.
+_ACTIONS = {
+    "copy":  (("c",), 67),   # C
+    "paste": (("v",), 86),   # V
+    "cut":   (("x",), 88),   # X
+    "all":   (("a",), 65),   # A
+    "undo":  (("z",), 90),   # Z
+    "redo":  (("y",), 89),   # Y
 }
+_BY_KEYSYM = {ks: act for act, (kss, _) in _ACTIONS.items() for ks in kss}
+_BY_KEYCODE = {kc: act for act, (_, kc) in _ACTIONS.items()}
+_VIRTUAL = {"copy": "<<Copy>>", "paste": "<<Paste>>", "cut": "<<Cut>>"}
 
-# Классы полей ввода (одна строка), где нужна ручная отмена/повтор и выделение всё.
+# Классы однострочных полей ввода (там ведём свою отмену/повтор и выделение).
 _ENTRY_CLASSES = ("Entry", "TEntry", "Spinbox", "TSpinbox", "TCombobox")
-
+_ALT_MASK = 0x20000            # бит Alt/AltGr на Windows — такие сочетания не трогаем
 _UNDO_LIMIT = 300
 
 
@@ -51,6 +59,13 @@ def _entry_set(w, val):
         w.insert(0, val)
     except Exception:  # noqa: BLE001
         pass
+
+
+def _is_text(w):
+    try:
+        return w.winfo_class() == "Text"
+    except tk.TclError:
+        return False
 
 
 # ------------------------------------------------------------- выделить всё
@@ -115,6 +130,14 @@ def _redo(event):
     return "break"
 
 
+def _text_native(w, virt):
+    try:
+        w.event_generate(virt)
+    except tk.TclError:
+        pass
+    return "break"
+
+
 def _enable_text_undo(event):
     # родная отмена tk.Text работает только при undo=True — включаем при фокусе
     try:
@@ -124,27 +147,46 @@ def _enable_text_undo(event):
         pass
 
 
+# --------------------------------------------- единый обработчик Ctrl+<клавиша>
+def _control_key(event):
+    """Ctrl+<клавиша> по keycode — ТОЛЬКО для не-латинских раскладок. На латинице
+    возвращает None: там всё делает штатный механизм Tk (виртуальные события) плюс наши
+    привязки <<Undo>>/<<Redo>>/<<SelectAll>> (см. enable_hotkeys)."""
+    if event.state & _ALT_MASK:            # Ctrl+Alt / AltGr — не наше
+        return None
+    if event.keysym.lower() in _BY_KEYSYM:  # латиница — обработает штатный Tk
+        return None
+    act = _BY_KEYCODE.get(event.keycode)    # прочие раскладки — по коду клавиши
+    if act is None:
+        return None
+    w = event.widget
+    if act == "all":
+        return _select_all(event)
+    if act == "undo":
+        return _text_native(w, "<<Undo>>") if _is_text(w) else _undo(event)
+    if act == "redo":
+        return _text_native(w, "<<Redo>>") if _is_text(w) else _redo(event)
+    return _text_native(w, _VIRTUAL[act])  # copy/paste/cut
+
+
 # ------------------------------------------------------------------- монтаж
 def enable_hotkeys(root):
-    """Включить горячие клавиши редактирования во всём приложении (один вызов)."""
-    # 1) Виртуальные события — обе раскладки.
-    for virt, keysyms in _MAP.items():
-        for ks in keysyms:
-            try:
-                root.event_add(virt, f"<Control-{ks}>")
-            except tk.TclError:            # неизвестный keysym в этой сборке Tk
-                pass
+    """Включить горячие клавиши редактирования во всём приложении (один вызов).
 
-    # 2) Отмена/повтор для однострочных полей — свой стек истории.
+    Привязки классовые (bind_class) — действуют на все окна интерпретатора Tk,
+    включая Toplevel каждой функции."""
+    # 1) Единый обработчик Ctrl+<клавиша> для НЕ-латинских раскладок — по keycode.
+    for cls in _ENTRY_CLASSES + ("Text",):
+        root.bind_class(cls, "<Control-KeyPress>", _control_key, add="+")
+    # 2) Латиница: у полей ввода нет своей отмены/повтора и «выделить всё» — привязываем
+    #    к штатным виртуальным событиям (Ctrl+Z/Y/A на латинице их триггерят по умолчанию).
     for cls in _ENTRY_CLASSES:
-        root.bind_class(cls, "<Key>", _on_key, add="+")
+        root.bind_class(cls, "<Key>", _on_key, add="+")          # снимки для отмены
         root.bind_class(cls, "<<Undo>>", _undo, add="+")
         root.bind_class(cls, "<<Redo>>", _redo, add="+")
         root.bind_class(cls, "<<SelectAll>>", _select_all, add="+")
-
-    # 3) Многострочный Text — родная отмена (undo=True) + выделить всё.
+    # 3) Многострочный Text — включить родную отмену при получении фокуса.
     root.bind_class("Text", "<FocusIn>", _enable_text_undo, add="+")
-    root.bind_class("Text", "<<SelectAll>>", _select_all, add="+")
 
 
 # Обратная совместимость со старым именем.

@@ -2,8 +2,7 @@
 
 Слой Controller (MVC): оркестрация сценария, без виджетов Tkinter.
   * prepare()     — прочитать поездки и (best-effort) распознать билеты со скана;
-  * build_rows()  — собрать строки таблицы: даты по рабочим дням выбранного месяца
-                    (среда — выходной, кроме переноса), привязка билетов 1-й->1-й,
+  * build_rows()  — собрать строки таблицы: даты из файла поездок, привязка билетов 1-й->1-й,
                     нормализация серии к известной, цена по серии;
   * generate()    — записать .ods из (возможно отредактированных) строк таблицы.
 """
@@ -28,7 +27,7 @@ ROW_KEYS = ("num", "date", "frm", "to", "purpose", "number", "series", "price")
 def prepare(trips_path, scan_path=None):
     """Прочитать поездки из файла и (best-effort) распознать билеты со скана.
 
-    Даты здесь НЕ проставляются — их выставляет build_rows() по выбранному месяцу."""
+    Даты читаются из файла поездок и далее сохраняются без календарного пересчёта."""
     trips, header = parser.read_trips(trips_path)
     tickets = parser.ocr_tickets(scan_path) if scan_path else []
     return {"trips": trips, "header": header, "tickets": tickets,
@@ -178,9 +177,14 @@ def build_rows(prepared, year, month, settings=None):
 
     Возвращает (rows, note). rows — список dict с ключами ROW_KEYS. Билеты
     привязываются по порядку 1-й->1-я поездка; серия нормализуется к известной,
-    цена считается по серии. Даты проставляются по рабочим дням месяца."""
+    цена считается по серии. Даты сохраняются из файла поездок; year/month задают
+    период отчёта и не меняют даты строк."""
     settings = settings or storage.load_settings()
-    trips, note = assign_dates(prepared["trips"], year, month, storage.load_calendar())
+    trips = prepared["trips"]
+    missing = sum(1 for trip in trips if not str(trip.get("date") or "").strip())
+    note = "Даты взяты из файла поездок без пересчёта по календарю."
+    if missing:
+        note += f" ⚠ Без даты: {missing} поездок — проверьте и заполните вручную."
     ocr = prepared.get("tickets", [])
     rows = []
     for i, trip in enumerate(trips):

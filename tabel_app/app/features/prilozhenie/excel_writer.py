@@ -259,8 +259,8 @@ def generate(out_path, context, keep_open=False):
     ws.row(ROW_HDR - 1).height = 600
 
     # --- Печать: альбомная, вписать в 1 страницу по ширине ---
-    ws.header_str = ""
-    ws.footer_str = ""
+    ws.header_str = b""
+    ws.footer_str = b""
     ws.portrait = False
     ws.fit_num_pages = 1
     ws.fit_width_to_pages = 1

@@ -254,8 +254,8 @@ def generate(template_path, out_path, context, keep_open=False):
 
     from ...core.xls_util import repeat_print_rows
     repeat_print_rows(wb, 0, T_HEADER_LAST)
-    ws.header_str = ""
-    ws.footer_str = ""
+    ws.header_str = b""
+    ws.footer_str = b""
     ws.portrait = False  # Т-13 — альбомная
 
     if os.path.exists(out_path):

@@ -14,7 +14,7 @@ def remove_headers_footers(path):
         with zipfile.ZipFile(path) as source, zipfile.ZipFile(temporary, "w") as target:
             for info in source.infolist():
                 data = source.read(info.filename)
-                if info.filename.endswith(".xml"):
+                if info.filename.endswith(".xml") and data.strip():
                     from xml.dom import minidom
                     doc = minidom.parseString(data)
                     changed = False

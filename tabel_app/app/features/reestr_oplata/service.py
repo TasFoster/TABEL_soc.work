@@ -17,6 +17,7 @@ from ..reestr.journal import norm_fio, parse_journal_detailed
 from . import ods_editor as ed
 
 # Категории изменений (для группировки в предпросмотре)
+CAT_CONTRACT = "contract"
 CAT_SUM = "sum"            # Гос: изменить суммы E/F/H существующего клиента
 CAT_SNYAT = "snyat"        # Гос: обнулить снятого клиента (нет в журнале)
 CAT_NEW = "new"            # Гос: новый клиент (нужно назначить соцработника)
@@ -25,6 +26,7 @@ CAT_DOP_SNYAT = "dop_snyat"  # Доп: обнулить строку (нет в 
 CAT_DOP_UPD = "dop_upd"    # Доп: обновить сумму существующей строки (сменился ярлык договора)
 
 CAT_TITLES = {
+    CAT_CONTRACT: "Номер договора",
     CAT_SUM: "Суммы (Гос)",
     CAT_SNYAT: "Снятые (Гос)",
     CAT_NEW: "Новые клиенты (Гос)",
@@ -96,6 +98,11 @@ def compute_plan(model, journal):
                         CAT_SNYAT, c.fio_full, b.worker_fio, "обнулить (нет в журнале)",
                         data={"client": c}))
                 continue
+            contracts = rec.get("gos", {})
+            if c.contract not in contracts and len(contracts) == 1:
+                new_contract = next(iter(contracts))
+                plan.changes.append(Change(CAT_CONTRACT, c.fio_full, b.worker_fio,
+                    f"{c.contract} → {new_contract}", data={"client": c, "contract": new_contract}))
             ne = _gos_sum(rec, c.contract)
             nh = _dop_total(rec) or None
             old = (_num(c.e_oplata), _num(c.f_koplate), _num(c.h_dop))
@@ -216,7 +223,12 @@ def apply_plan(model, plan, journal):
 
     for ch in plan.selected:
         d = ch.data
-        if ch.category == CAT_SUM:
+        if ch.category == CAT_CONTRACT:
+            c = d["client"]
+            c.contract = d["contract"]
+            c.contract_raw = ed._dogovor(c.contract)
+            ed._set_cell(c.row, 3, c.contract_raw)
+        elif ch.category == CAT_SUM:
             c = d["client"]
             if d["e"] is not None:
                 ed.set_gos_sums(c, d["e"], d["f"])

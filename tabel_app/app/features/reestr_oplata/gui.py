@@ -296,6 +296,8 @@ class ReestrOplataWindow(tk.Toplevel):
         self.destroy()
 
     def _period_my(self):
+        if self._header_override:
+            return self._header_override[:2]
         try:
             _, mm, yy = self.plan.period[0].split(".")
             return int(mm), int(yy)

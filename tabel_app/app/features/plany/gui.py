@@ -164,6 +164,8 @@ class PlanyWindow(tk.Toplevel):
         if not month:
             return
         dept, year = self._dept(), self._year()
+        if dept not in storage.load_templates()["departments"]:
+            messagebox.showinfo("Структура плана", "Для этого ОСОД используется структура плана отделения 9. Проверьте мероприятия, сроки и ответственных перед формированием.")
         plan = service.build_plan(dept, month, year)
         win = tk.Toplevel(self)
         win.title("Редактор плана — ОСОД № " + dept)
@@ -226,6 +228,9 @@ class PlanyWindow(tk.Toplevel):
             messagebox.showinfo("Не выбран месяц", "Выделите месяц в таблице.")
             return
         dept, year = self._dept(), self._year()
+        if dept not in storage.load_templates()["departments"] and storage.plan_load(dept, year, month) is None:
+            messagebox.showinfo("План", "Сначала проверьте и сохраните содержание через «Редактировать план».")
+            return
         default = "План_отд%s_%s_%d.odt" % (dept, MONTHS_NOM[month], year)
         out = filedialog.asksaveasfilename(
             title="Сохранить как…", defaultextension=".odt", initialfile=default,
@@ -253,6 +258,9 @@ class PlanyWindow(tk.Toplevel):
 
     def _generate_all(self):
         dept, year = self._dept(), self._year()
+        if dept not in storage.load_templates()["departments"] and any(storage.plan_load(dept, year, m) is None for m in range(1, 13)):
+            messagebox.showinfo("Планы", "Сначала проверьте и сохраните все 12 планов в редакторе.")
+            return
         folder = filedialog.askdirectory(
             title="Папка для 12 планов", initialdir=ui_state.last_dir("save") or None)
         if not folder:

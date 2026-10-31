@@ -42,7 +42,13 @@ def shift_years(text, offset):
 
 def effective_worker(dept, year, month):
     """Соцработник для (отд, год, месяц): запомненный, иначе из шаблона."""
-    return storage.worker_load(dept, year, month) or storage.default_worker(dept, month)
+    saved = storage.worker_load(dept, year, month)
+    if saved:
+        return saved
+    if str(dept) not in storage.load_templates()["departments"]:
+        people = storage.department_records().get(str(dept), {}).get("employees", [])
+        return next((p["fio"] for p in people if "работник" in (p.get("position") or "").lower()), "")
+    return storage.default_worker(dept, month)
 
 
 def build_plan(dept, month, year):

@@ -210,6 +210,8 @@ def load_model(ods_path):
         _parse_dop(m)
     if m.dengi_table is not None:
         _parse_dengi(m)
+        if any(d.ref_block is None for d in m.dengi_rows) or not m.dengi_rows:
+            _normalize_money_sheet(m)
     return m
 
 
@@ -481,3 +483,30 @@ def save(m, out_path):
         os.remove(out_path)
     m.doc.save(out_path)
     return out_path
+
+
+def _normalize_money_sheet(m):
+    """Привести старый клиентский лист денег к сводке по блокам ГОС."""
+    from odf.table import Table, TableRow, TableCell
+    from .model import DengiRow
+    old = m.dengi_table
+    parent = old.parentNode
+    # Исходный лист сохраняется, поскольку он может содержать ручные примечания.
+    old.setAttribute("name", "деньги (исходный)")
+    table = Table(name=SHEET_DENGI)
+    parent.addElement(table)
+    m.dengi_table = table
+    m.dengi_rows = []
+    def row(values):
+        tr = TableRow()
+        for value in values:
+            cell = TableCell(valuetype="string")
+            cell.addElement(P(text=str(value)))
+            tr.addElement(cell)
+        table.addElement(tr)
+        return tr
+    row(["№", "Социальный работник", "Итого к оплате"])
+    for i, block in enumerate(m.gos_blocks, 1):
+        tr = row([i, block.worker_fio, ""])
+        m.dengi_rows.append(DengiRow(tr, block.worker_fio, block))
+    m.dengi_itogo_row = row(["", "Итого", ""])

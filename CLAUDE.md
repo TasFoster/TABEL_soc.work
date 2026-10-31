@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> Before working on this repository, read [AGENTS.md](AGENTS.md). It defines shared agent rules, including selecting a specific feature or a general improvement (database, feature launcher, or shared infrastructure) before making changes. This file is the supplementary technical reference; shared workflow rules live in AGENTS.md.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is

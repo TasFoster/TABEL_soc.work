@@ -186,3 +186,19 @@ class TemplateStyles:
         """Глубокая копия XFStyle (чтобы менять заливку, не трогая кеш)."""
         import copy
         return copy.deepcopy(st)
+
+
+def repeat_print_rows(workbook, first, last):
+    """BIFF8 Print_Titles для единственного листа (границы включительно)."""
+    import struct
+    from xlwt import BIFFRecords
+    original = workbook._Workbook__all_links_rec
+    def links():
+        existing = original()
+        if existing:
+            raise ValueError("Print_Titles: книга уже содержит внешние ссылки")
+        return (BIFFRecords.InternalReferenceSupBookRecord(1).get() +
+                BIFFRecords.ExternSheetRecord([(0, 0, 0)]).get() +
+                BIFFRecords.NameRecord(0x20, 0, 7, 1,
+                    b'\x3b' + struct.pack('<HHHHH', 0, first, last, 0, 255)).get())
+    workbook._Workbook__all_links_rec = links

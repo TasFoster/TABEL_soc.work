@@ -248,6 +248,8 @@ def generate(out_path, context, keep_open=False):
     ws.col(R_NACH - 1).width = col_width(12)
 
     # --- Печать: альбомная, вписать в 1 страницу по ширине ---
+    ws.header_str = ""
+    ws.footer_str = ""
     ws.portrait = False
     ws.fit_num_pages = 1
     ws.fit_width_to_pages = 1

@@ -167,7 +167,7 @@ def generate(out_path, context, keep_open=False):
     put_merge(ROW_HDR, R_NACH, ROW_DAYNUM, R_NACH, "Начислено, руб.", hdr_wrap)
 
     cell = S.get()
-    cell_left = S.get(align="left")
+    cell_left = S.get(align="left", wrap=True)
     cell_wknd = S.get(fill=SHADE_WEEKEND)
 
     # --- Сотрудники ---
@@ -175,6 +175,8 @@ def generate(out_path, context, keep_open=False):
     row = FIRST_WORKER_ROW
     for w in workers:
         top, bottom = row, row + 1
+        ws.row(top - 1).height_mismatch = True
+        ws.row(top - 1).height = max(400, ((len(w["fio"]) + 37) // 38) * 240)
         put_merge(top, L_NUM, bottom, L_NUM, w["n"], cell)
         put_merge(top, L_FIO, bottom, L_FIO, w["fio"], cell_left)
         put_merge(top, R_NUM, bottom, R_NUM, w["n"], cell)
@@ -233,19 +235,28 @@ def generate(out_path, context, keep_open=False):
     sig = last_row + 2
     put(sig, L_FIO, context.get("zav_line", ""), S.get(align="left", border=False))
 
+    put_merge(sig, R_FIO, sig + 1, R_TOTAL, context.get("zav_line", ""),
+              S.get(align="left", wrap=True, border=False))
+
     # --- Ширины колонок ---
     ws.col(L_NUM - 1).width = col_width(4)
-    ws.col(L_FIO - 1).width = col_width(26)
+    fio_width = min(70, max(32, max(len(w["fio"]) for w in workers) + 2))
+    ws.col(L_FIO - 1).width = col_width(fio_width)
     ws.col(L_SEC - 1).width = col_width(6)
     for d in range(ndays):
         ws.col(L_DAY1 - 1 + d).width = col_width(3.5)
     ws.col(L_TOTAL - 1).width = col_width(11)
-    ws.col(R_FIO - 1).width = col_width(26)
+    ws.col(R_FIO - 1).width = col_width(fio_width)
     ws.col(R_NORMA - 1).width = col_width(7)
     ws.col(R_TOTAL - 1).width = col_width(11)
     ws.col(R_OKLAD - 1).width = col_width(9)
     ws.col(R_NORMACD - 1).width = col_width(9)
     ws.col(R_NACH - 1).width = col_width(12)
+
+    for col in (R_OKLAD, R_NORMACD, R_NACH):
+        ws.col(col - 1).hidden = True
+    ws.row(ROW_HDR - 1).height_mismatch = True
+    ws.row(ROW_HDR - 1).height = 600
 
     # --- Печать: альбомная, вписать в 1 страницу по ширине ---
     ws.header_str = ""

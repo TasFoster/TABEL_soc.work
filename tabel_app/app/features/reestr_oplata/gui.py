@@ -30,6 +30,7 @@ class ReestrOplataWindow(tk.Toplevel):
         self.model = None
         self.journal = None
         self.plan = None
+        self._header_override = None
         self._order = []                       # индексы plan.changes в порядке дерева
 
         self.ods_var = tk.StringVar()
@@ -81,6 +82,8 @@ class ReestrOplataWindow(tk.Toplevel):
         self.apply_btn = ttk.Button(bottom, text="Применить и сохранить",
                                     command=self._apply, state="disabled")
         self.apply_btn.pack(side="right")
+        ttk.Button(bottom, text="Шапка…", command=self._edit_header).pack(side="left")
+        ttk.Button(bottom, text="Пересмотр…", command=self._edit_marks).pack(side="left")
         ttk.Button(bottom, text="Снять все", command=lambda: self._mark_all(False)).pack(
             side="right", padx=4)
         ttk.Button(bottom, text="Отметить все", command=lambda: self._mark_all(True)).pack(
@@ -114,6 +117,7 @@ class ReestrOplataWindow(tk.Toplevel):
         if not jrn or not os.path.exists(jrn):
             messagebox.showwarning("Нет файла", "Укажите отчёт по договорам .xls.")
             return
+        self._header_override = None
         self.info.set("Анализирую…")
         self.update_idletasks()
         try:
@@ -209,10 +213,47 @@ class ReestrOplataWindow(tk.Toplevel):
             self._update_row(i)
 
     # ------------------------------------------------------------------ применение
+    def _edit_header(self):
+        from tkinter import simpledialog
+        if not self.model:
+            return
+        month = simpledialog.askinteger("Шапка", "Месяц (1–12):", parent=self, minvalue=1, maxvalue=12)
+        if month is None:
+            return
+        year = simpledialog.askinteger("Шапка", "Год:", parent=self, minvalue=1900, maxvalue=2200)
+        if year is None:
+            return
+        amount = simpledialog.askfloat("Шапка", "Сумма к оплате (только текст шапки, расчёты не меняются):", parent=self, minvalue=0)
+        if amount is not None:
+            self._header_override = (month, year, amount)
+            self.apply_btn.config(state="normal")
+
+    def _edit_marks(self):
+        from tkinter import simpledialog
+        from . import ods_editor as ed
+        if not self.model:
+            return
+        clients = [c for b in self.model.gos_blocks for c in b.clients]
+        win = tk.Toplevel(self)
+        win.title("Пометки пересмотра")
+        box = tk.Listbox(win, width=75, height=20)
+        box.pack(fill="both", expand=True)
+        def refresh():
+            box.delete(0, "end")
+            for c in clients:
+                box.insert("end", ("✓ " if c.peresmotr else "— ") + c.fio_full)
+        def toggle():
+            if box.curselection():
+                c = clients[box.curselection()[0]]
+                ed.set_gos_peresmotr(c, not bool(c.peresmotr))
+                refresh()
+                self.apply_btn.config(state="normal")
+        ttk.Button(win, text="Поставить / снять пометку", command=toggle).pack()
+        refresh()
+
     def _apply(self):
         sel = self.plan.selected if self.plan else []
-        if not sel:
-            messagebox.showwarning("Пусто", "Не отмечено ни одного изменения.")
+        if not self.model:
             return
         unassigned = [c for c in sel if c.category == service.CAT_NEW and not c.worker]
         if unassigned:
@@ -235,6 +276,10 @@ class ReestrOplataWindow(tk.Toplevel):
         try:
             from . import ods_editor as ed
             service.apply_plan(self.model, self.plan, self.journal)
+            if self._header_override:
+                from ..reestr.ods_writer import MONTHS_PREP
+                m, y, amount = self._header_override
+                ed._update_letter(self.model.gos_letter_cell, amount, MONTHS_PREP[m], str(y))
             ed.save(self.model, out)
             month, year = self._period_my()
             documents.save_file("reestr_oplata", out, {"month": month, "year": year})

@@ -47,7 +47,7 @@ class PlanyWindow(tk.Toplevel):
         top.pack(fill="x", **pad)
         g = ttk.Frame(top)
         g.pack(fill="x", padx=6, pady=4)
-        ttk.Label(g, text="Отделение №:").grid(row=0, column=0, sticky="w")
+        ttk.Label(g, text="ОСОД №:").grid(row=0, column=0, sticky="w")
         cb = ttk.Combobox(g, textvariable=self.dept_var, state="readonly", width=6, values=depts)
         cb.grid(row=0, column=1, sticky="w", padx=4)
         cb.bind("<<ComboboxSelected>>", lambda e: self._reload())
@@ -76,6 +76,7 @@ class PlanyWindow(tk.Toplevel):
         self.gen_btn = ttk.Button(bottom, text="Сформировать месяц (.odt)",
                                   command=self._generate_one)
         self.gen_btn.pack(side="right")
+        ttk.Button(bottom, text="Редактировать план…", command=self._edit_plan).pack(side="left")
         self.gen_all_btn = ttk.Button(bottom, text="Сформировать все 12 (в папку)",
                                       command=self._generate_all)
         self.gen_all_btn.pack(side="right", padx=6)
@@ -99,7 +100,8 @@ class PlanyWindow(tk.Toplevel):
         year = self._year()
         self.tree.delete(*self.tree.get_children())
         for m in range(1, 13):
-            has = service.has_sign(dept, m)
+            saved = storage.plan_load(dept, year, m)
+            has = saved.get("has_sign_override", service.has_sign(dept, m)) if saved else service.has_sign(dept, m)
             worker = service.effective_worker(dept, year, m) if has else "—"
             self.tree.insert("", "end", iid=str(m),
                              values=(MONTHS_NOM[m].capitalize(), worker,
@@ -110,6 +112,9 @@ class PlanyWindow(tk.Toplevel):
             return
         rowid = self.tree.identify_row(event.y)
         colid = self.tree.identify_column(event.x)
+        if rowid and colid == "#3":
+            self._edit_plan()
+            return
         if not rowid or colid != "#2":            # править можно только «Соцработник»
             return
         month = int(rowid)
@@ -134,6 +139,11 @@ class PlanyWindow(tk.Toplevel):
             val = ed.get().strip()
             ed.destroy()
             storage.worker_save(self._dept(), self._year(), month, val)
+            saved = storage.plan_load(self._dept(), self._year(), month)
+            if saved and saved.get("sign_pos"):
+                si, ri = saved["sign_pos"]
+                saved["sections"][si]["rows"][ri][1] = saved.get("sign_prefix", "") + val + " " + saved.get("sign_suffix", "")
+                storage.plan_save(self._dept(), self._year(), month, saved)
             self.tree.set(rowid, "worker",
                           val or storage.default_worker(self._dept(), month))
             # если очистили — вернётся значение из шаблона
@@ -149,6 +159,63 @@ class PlanyWindow(tk.Toplevel):
         ed.bind("<Escape>", cancel)
 
     # ---------------------------------------------------------------- генерация
+    def _edit_plan(self):
+        month = self._selected_month()
+        if not month:
+            return
+        dept, year = self._dept(), self._year()
+        plan = service.build_plan(dept, month, year)
+        win = tk.Toplevel(self)
+        win.title("Редактор плана — ОСОД № " + dept)
+        win.geometry("1050x720")
+        entries = []
+        from tkinter import scrolledtext
+        canvas = tk.Canvas(win)
+        sb = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        sb.pack(side="right", fill="y")
+        canvas.pack(fill="both", expand=True)
+        canvas.configure(yscrollcommand=sb.set)
+        frame = ttk.Frame(canvas)
+        canvas.create_window((0,0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        def field(label, value, setter):
+            ttk.Label(frame, text=label).pack(anchor="w")
+            widget = scrolledtext.ScrolledText(frame, width=115, height=3, wrap="word")
+            widget.insert("1.0", value)
+            widget.pack(fill="x")
+            entries.append((widget, setter))
+        field("Шапка (каждая строка с новой строки)", "\n".join(plan.get("header", [])),
+              lambda v: plan.__setitem__("header", v.splitlines()))
+        field("Подпись заведующей", "\n".join(plan.get("footer", [])),
+              lambda v: plan.__setitem__("footer", v.splitlines()))
+        sign = tk.BooleanVar(value=service.has_sign(dept, month))
+        ttk.Checkbutton(frame, text="Есть заслушивание", variable=sign).pack(anchor="w")
+        people = storage.department_records().get(dept, {}).get("employees", [])
+        worker = tk.StringVar(value=service.effective_worker(dept, year, month))
+        ttk.Label(frame, text="Соцработник (список из табеля, можно вписать вручную)").pack(anchor="w")
+        ttk.Combobox(frame, textvariable=worker, values=[p['fio'] for p in people], width=70).pack(anchor="w")
+        for section in plan.get("sections", []):
+            ttk.Label(frame, text=section.get("title", "")).pack(anchor="w")
+            for row in section["rows"]:
+                for i, value in enumerate(row):
+                    field(str(i+1), value, lambda v, row=row, i=i: row.__setitem__(i, v))
+        def save():
+            for widget, setter in entries:
+                setter(widget.get("1.0", "end-1c"))
+            pos = plan.get("sign_pos")
+            if pos:
+                si, ri = pos
+                plan["sections"][si]["rows"][ri][1] = (
+                    plan.get("sign_prefix", "") + worker.get() + " " + plan.get("sign_suffix", "")) if sign.get() else ""
+            elif sign.get():
+                plan.setdefault("sections", []).append({"title":"Заслушивание", "rows":[["", "Заслушивание " + worker.get(), "", "", ""]]})
+            plan["has_sign_override"] = sign.get()
+            storage.worker_save(dept, year, month, worker.get())
+            storage.plan_save(dept, year, month, plan)
+            win.destroy()
+            self._reload()
+        ttk.Button(win, text="Сохранить изменения", command=save).pack(side="bottom")
+
     def _selected_month(self):
         sel = self.tree.selection()
         return int(sel[0]) if sel else None

@@ -30,7 +30,7 @@ def load_templates():
 
 def departments():
     """Список номеров отделений, для которых есть шаблоны (отсортирован)."""
-    return sorted(load_templates()["departments"].keys(), key=lambda x: int(x))
+    return sorted(set(load_templates()["departments"]) | set(department_records()), key=lambda x: int(x))
 
 
 def baseline_year():
@@ -39,7 +39,8 @@ def baseline_year():
 
 def month_template(dept, month):
     """Шаблон месяца: dict с header/footer/sections/sign_* /col_widths."""
-    return load_templates()["departments"][str(dept)]["months"][str(int(month))]
+    templates = load_templates()["departments"]
+    return templates.get(str(dept), templates["9"])["months"][str(int(month))]
 
 
 def default_worker(dept, month):
@@ -58,3 +59,21 @@ def worker_save(dept, year, month, worker):
 
 def workers_all(dept, year):
     return _db.plany_workers_load_all(dept, year)
+
+
+def department_records():
+    import re
+    result = {}
+    for d in _db.departments_load()["departments"]:
+        match = re.search(r"№\s*(\d+)", d["name"])
+        if match:
+            result[match.group(1)] = d
+    return result
+
+
+def plan_load(dept, year, month):
+    return _db.reestr_kv_load(f"plan_edit:{dept}:{year}:{month}", None)
+
+
+def plan_save(dept, year, month, plan):
+    _db.reestr_kv_save(f"plan_edit:{dept}:{year}:{month}", plan)

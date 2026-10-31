@@ -47,6 +47,9 @@ def effective_worker(dept, year, month):
 
 def build_plan(dept, month, year):
     """Собрать данные плана: копия шаблона со сдвинутым годом и подставленным соцработником."""
+    saved = storage.plan_load(dept, year, month)
+    if saved is not None:
+        return copy.deepcopy(saved)
     tpl = storage.month_template(dept, month)
     offset = int(year) - storage.baseline_year()
     plan = copy.deepcopy(tpl)
@@ -66,6 +69,13 @@ def build_plan(dept, month, year):
     plan["footer"] = [shift_years(x, offset) for x in plan.get("footer", [])]
     for sec in plan.get("sections", []):
         sec["rows"] = [[shift_years(c, offset) for c in row] for row in sec["rows"]]
+    record = storage.department_records().get(str(dept), {})
+    source_dept = str(dept) if str(dept) in storage.load_templates()["departments"] else "9"
+    for key in ("header", "footer"):
+        plan[key] = [re.sub(r"№\s*" + source_dept + r"(?!\d)", "№ " + str(dept), line)
+                     for line in plan.get(key, [])]
+    if record.get("responsible_fio"):
+        plan["footer"] = [f"Заведующая ОСОД № {dept} _________________ {record['responsible_fio']}"]
     return plan
 
 

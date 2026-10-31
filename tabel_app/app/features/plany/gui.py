@@ -209,8 +209,10 @@ class PlanyWindow(tk.Toplevel):
                 si, ri = pos
                 plan["sections"][si]["rows"][ri][1] = (
                     plan.get("sign_prefix", "") + worker.get() + " " + plan.get("sign_suffix", "")) if sign.get() else ""
-            elif sign.get():
-                plan.setdefault("sections", []).append({"title":"Заслушивание", "rows":[["", "Заслушивание " + worker.get(), "", "", ""]]})
+            else:
+                plan["sections"] = [section for section in plan.get("sections", []) if not section.get("manual_sign")]
+                if sign.get():
+                    plan["sections"].append({"title":"Заслушивание", "manual_sign": True, "rows":[["", "Заслушивание " + worker.get(), "", "", ""]]})
             plan["has_sign_override"] = sign.get()
             storage.worker_save(dept, year, month, worker.get())
             storage.plan_save(dept, year, month, plan)

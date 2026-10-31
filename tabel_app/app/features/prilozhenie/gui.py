@@ -103,6 +103,7 @@ class PrilozhenieWindow(tk.Toplevel):
 
         btns = ttk.Frame(self)
         btns.pack(fill="x", **pad)
+        ttk.Button(btns, text="Добавить / изменить сотрудников…", command=self._manage_workers).pack(side="left")
         ttk.Button(btns, text="Нагрузка сотрудника…", command=self._edit_load).pack(side="left")
         ttk.Button(btns, text="Нагрузка по периодам…", command=self._edit_periods).pack(side="left", padx=4)
         ttk.Button(btns, text="+ Отсутствие", command=self._add_absence).pack(side="left", padx=4)
@@ -215,6 +216,15 @@ class PrilozhenieWindow(tk.Toplevel):
         self.warn.configure(state="disabled")
 
     # ----------------------------------------------------------- actions
+    def _manage_workers(self):
+        from ..timesheet import storage as ts
+        from ..timesheet.gui import DepartmentManager
+        dlg = DepartmentManager(self, ts.load_departments(), ts.load_settings())
+        self.wait_window(dlg)
+        if dlg.saved:
+            self.departments = storage.list_departments()
+            self._reload_departments_combo()
+
     def _edit_load(self):
         w = self._selected_worker()
         if not w:

@@ -59,12 +59,9 @@ def _fill_ud(ws, data, period_text):
         h = base.get("H", 0) + (H.get(key) or 0)   # кол-во частичная оплата
         i = base.get("I", 0) + (I.get(key) or 0)   # деньги частичная оплата
         j = base.get("J", 0) + (J.get(key) or 0)   # кол-во бесплатно
-        if h:
-            ws.cell(row, 8).value = _num_out(h)
-        if i:
-            ws.cell(row, 9).value = _num_out(i)
-        if j:
-            ws.cell(row, 10).value = _num_out(j)
+        ws.cell(row, 8).value = _num_out(h)
+        ws.cell(row, 9).value = _num_out(i)
+        ws.cell(row, 10).value = _num_out(j)
 
 
 def _client_row(ws, r, idx, fio, vals):

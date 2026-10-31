@@ -3,13 +3,14 @@
 Только стандартная библиотека (urllib/json/ssl/hashlib/subprocess/winreg) — без внешних
 зависимостей. Сетевой код по образцу `feedback.py` (User-Agent, timeout, HTTPS-контекст).
 
-Канал распространения — публичная папка Яндекс.Диска: там лежат `version.json` (манифест
+Основной канал — GitHub Releases; Яндекс.Диск сохранён как совместимый адаптер.
+В канале обновления там лежат `version.json` (манифест
 версий) и установщики обеих сборок. Программа читает манифест, сравнивает версии и, если
 есть новее, скачивает установщик и запускает его — установщик Inno обновляет программу
 поверх (через мьютекс `TabelAppRunningMutex`). Для portable-копии установщик не запускается
 поверх (см. installation_kind / UpdateDialog) — он лишь скачивается.
 
-Перед публикацией укажите YANDEX_PUBLIC_KEY (публичную ссылку на папку Яндекс.Диска).
+Манифест GitHub публикуется вместе с обоими установщиками после успешной сборки.
 """
 
 import hashlib
@@ -26,7 +27,11 @@ import urllib.request
 from .version import APP_VERSION, app_variant
 
 # --- канал обновления -------------------------------------------------------------
-UPDATE_CHANNEL = "yandex"
+UPDATE_CHANNEL = "github"
+GITHUB_REPOSITORY = "TasFoster/TABEL_soc.work"
+GITHUB_MANIFEST_URL = (
+    f"https://github.com/{GITHUB_REPOSITORY}/releases/latest/download/version.json"
+)
 # Публичная ссылка на ПАПКУ Яндекс.Диска с version.json и установщиками.
 YANDEX_PUBLIC_KEY = "https://disk.yandex.ru/d/Gb0wzbmbP8rrqw"
 MANIFEST_PATH = "/version.json"
@@ -49,7 +54,11 @@ class UpdateError(Exception):
 
 def is_configured():
     """Настроен ли канал обновления (задан публичный ключ или тестовый манифест)."""
-    return bool(YANDEX_PUBLIC_KEY) or bool(os.environ.get("TABEL_UPDATE_MANIFEST"))
+    if os.environ.get("TABEL_UPDATE_MANIFEST"):
+        return True
+    if UPDATE_CHANNEL == "github":
+        return bool(GITHUB_REPOSITORY)
+    return UPDATE_CHANNEL == "yandex" and bool(YANDEX_PUBLIC_KEY)
 
 
 def variant_key():
@@ -106,6 +115,8 @@ def _manifest_url():
     env = os.environ.get("TABEL_UPDATE_MANIFEST")
     if env:
         return env
+    if UPDATE_CHANNEL == "github":
+        return GITHUB_MANIFEST_URL
     if UPDATE_CHANNEL == "yandex":
         return _yadisk_href(MANIFEST_PATH)
     raise UpdateError(f"Неизвестный канал обновления: {UPDATE_CHANNEL}")
@@ -133,13 +144,22 @@ def check_for_update():
     entry = (manifest.get("latest") or {}).get(variant_key())
     if not entry or not is_newer(entry.get("version"), APP_VERSION):
         return None
+    version = entry.get("version", "")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise UpdateError("Некорректная версия обновления.")
+    digest = (entry.get("sha256") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise UpdateError("В манифесте отсутствует корректная контрольная сумма SHA-256.")
+    url = _download_url(entry)
+    if not url.lower().startswith("https://") and not _allow_insecure():
+        raise UpdateError("Ссылка на обновление не защищена (не https).")
     return {
-        "version": entry.get("version"),
+        "version": version,
         "date": entry.get("date", ""),
         "notes": entry.get("notes", ""),
         "size": entry.get("size"),
-        "sha256": (entry.get("sha256") or "").lower(),
-        "url": _download_url(entry),
+        "sha256": digest,
+        "url": url,
     }
 
 
@@ -175,8 +195,8 @@ def download(url, dest, progress_cb=None):
 
 
 def verify_sha256(path, expected):
-    if not expected:
-        return True   # хеш не задан — пропускаем проверку
+    if not expected or not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+        return False
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -216,3 +236,4 @@ def _inno_installed():
             return True
     except OSError:
         return False
+

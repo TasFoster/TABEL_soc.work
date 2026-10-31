@@ -163,7 +163,7 @@ class UpdateDialog(tk.Toplevel):
                         raise updater.UpdateError("Контрольная сумма не совпала.")
                 self.after(0, lambda: on_done(dest))
             except Exception as e:  # noqa: BLE001
-                self.after(0, lambda: self._fail(e))
+                self.after(0, lambda error=e: self._fail(error))
         threading.Thread(target=work, daemon=True).start()
 
     def _fail(self, e):
@@ -178,3 +178,4 @@ class UpdateDialog(tk.Toplevel):
     def _skip(self):
         ui_state.set_skipped_update(self.info["version"])
         self.destroy()
+

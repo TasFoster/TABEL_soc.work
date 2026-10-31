@@ -3,8 +3,16 @@
 #ifndef AppVer
   #define AppVer "1.3.0"
 #endif
+#ifndef SrcDir
 #define SrcDir "C:\Users\User\tabel_pkg\full"
+#endif
+#ifndef OutDir
 #define OutDir "C:\Users\User\tabel_pkg\out"
+#endif
+
+#ifndef SetupName
+  #define SetupName "Табель_полная_setup"
+#endif
 
 [Setup]
 AppId={{7F3A2C10-9B4D-4E61-AE12-1F2D3C4B5A60}
@@ -16,7 +24,7 @@ DefaultGroupName=Табель
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir={#OutDir}
-OutputBaseFilename=Табель_полная_setup
+OutputBaseFilename={#SetupName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -46,4 +54,5 @@ Name: "{autodesktop}\Табель"; Filename: "{app}\Табель.exe"; Tasks: d
 
 [Run]
 Filename: "{app}\Табель.exe"; Description: "Запустить Табель"; Flags: nowait postinstall skipifsilent
+
 

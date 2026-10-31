@@ -8,11 +8,14 @@
 #   powershell -ExecutionPolicy Bypass -File build.ps1 -Variant lite   # 3 features, no proezd/OCR
 # Result: <build>\dist\Tabel.exe  (packaging into a delivery folder is done separately).
 
-param([string]$Variant = "full")
+param(
+  [ValidateSet("full", "lite")][string]$Variant = "full",
+  [string]$BuildDir = (Join-Path $env:TEMP "tabel_build")
+)
 
 $ErrorActionPreference = "Stop"
 $src = $PSScriptRoot
-$build = "C:\Users\$env:USERNAME\tabel_build"
+$build = $BuildDir
 
 Write-Host "Variant: $Variant"
 Write-Host "Source: $src"
@@ -21,6 +24,7 @@ Write-Host "Build dir: $build"
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 New-Item -ItemType Directory -Path $build | Out-Null
 robocopy $src $build /E /XD build dist __pycache__ /XF *.spec /NFL /NDL /NJH /NJS /NP | Out-Null
+if ($LASTEXITCODE -ge 8) { throw "Source copy failed: $LASTEXITCODE" }
 
 Set-Location $build
 
@@ -64,7 +68,7 @@ $common = @(
   '--hidden-import', 'xlrd', '--hidden-import', 'sqlite3',
   '--collect-submodules', 'xlwt', '--collect-submodules', 'odf',
   '--collect-submodules', 'openpyxl',
-  # CustomTkinter (главное меню, Фаза 6): нужны его JSON-темы (--collect-data) и darkdetect.
+  # CustomTkinter themes and darkdetect are required by the launcher.
   '--collect-data', 'customtkinter', '--collect-submodules', 'customtkinter',
   '--hidden-import', 'darkdetect'
 )
@@ -90,11 +94,13 @@ if ($Variant -eq 'lite') {
   )
 }
 
-& pyinstaller @pyiArgs
+& python -m PyInstaller @pyiArgs
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed: $LASTEXITCODE" }
 
 $exe = Join-Path $build "dist\Tabel.exe"
 if (Test-Path $exe) {
     Write-Host "DONE ($Variant): $exe"
 } else {
-    Write-Host "ERROR: exe was not created."
+    throw "EXE was not created."
 }
+

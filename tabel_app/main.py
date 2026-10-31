@@ -337,13 +337,45 @@ def _selftest_ocr():
             f.write(traceback.format_exc())
 
 
+def _selftest_release():
+    """Проверка зависимостей собранного EXE без открытия окон и работы с БД."""
+    import json
+    import traceback
+    result = {"ok": False}
+    try:
+        from app import shell
+        from app.core import updater, version
+        from app.features.registry import get_features
+        variant, expected_version = sys.argv[-2:]
+        features = get_features()
+        expected = 10 if variant == "full" else 9
+        keys = [feature.key for feature in features]
+        if len(features) != expected or (("proezd" in keys) != (variant == "full")):
+            raise RuntimeError(f"Unexpected features: {keys}")
+        if version.APP_VERSION != expected_version or updater.variant_key() != variant:
+            raise RuntimeError("Wrong embedded version or variant")
+        if variant == "full":
+            from app.features.proezd import parser
+            if not parser.ocr_available():
+                raise RuntimeError("OCR dependencies missing in full build")
+            from winrt.windows.graphics.imaging import BitmapDecoder
+            from winrt.windows.storage import StorageFile
+        result = {"ok": True, "version": version.APP_VERSION, "variant": variant, "features": keys}
+    except Exception:
+        result["error"] = traceback.format_exc()
+    with open(os.path.join(_base_dir(), "selftest_release_result.json"), "w", encoding="utf-8") as stream:
+        json.dump(result, stream, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
     try:
         from app.core import logging_setup
         logging_setup.setup()
     except Exception:  # noqa: BLE001 — логирование не должно мешать запуску
         pass
-    if "--selftest" in sys.argv:
+    if "--selftest-release" in sys.argv:
+        _selftest_release()
+    elif "--selftest" in sys.argv:
         _selftest()
     elif "--selftest-reestr" in sys.argv:
         _selftest_reestr()
@@ -370,3 +402,4 @@ if __name__ == "__main__":
         from app.shell import run
 
         run()
+

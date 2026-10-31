@@ -1,0 +1,93 @@
+name: Windows installers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tabel_app/VERSION
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tabel_app/requirements*.txt
+      - name: Validate version and prevent replacing a published release
+        id: version
+        run: |
+          $version = (Get-Content tabel_app/VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid VERSION' }
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+          $existing = gh release list --limit 100 --json tagName,isDraft | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot list releases' }
+          $release = $existing | Where-Object tagName -eq "v$version"
+          if ($release -and -not $release.isDraft) { throw 'Version already published. Increase VERSION.' }
+      - name: Install dependencies
+        run: |
+          python -m pip install -r tabel_app/requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          python -c "import customtkinter, cv2; from winrt.windows.media.ocr import OcrEngine; from winrt.windows.graphics.imaging import BitmapDecoder; from winrt.windows.storage import StorageFile"
+          if ($LASTEXITCODE -ne 0) { throw 'Import check failed' }
+      - name: Unit tests
+        run: |
+          python -m unittest discover -s tabel_app/tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+      - name: Install Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+      - name: Build installers and version.json
+        run: |
+          & ./tabel_app/tools/build_release.ps1 -OutDir "$env:RUNNER_TEMP/tabel-release" -Repository $env:GITHUB_REPOSITORY
+      - name: Keep build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ steps.version.outputs.tag }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/tabel-release/*setup.exe
+            ${{ runner.temp }}/tabel-release/version.json
+      - name: Publish complete release
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $existing = gh release list --limit 100 --json tagName,isDraft | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot list releases' }
+          $release = $existing | Where-Object tagName -eq $tag
+          if ($release -and -not $release.isDraft) { throw 'Release already published' }
+          if (-not $release) {
+            gh release create $tag --draft --target $env:GITHUB_SHA --title "Tabel $tag" --notes-file tabel_app/RELEASE_NOTES.md
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot create draft release' }
+          }
+          # A failed run may leave a draft. Never reuse a draft for another commit.
+          $target = gh release view $tag --json targetCommitish --jq .targetCommitish
+          if ($LASTEXITCODE -ne 0 -or $target -ne $env:GITHUB_SHA) { throw 'Draft tag does not match this build' }
+          $out = "$env:RUNNER_TEMP/tabel-release"
+          gh release upload $tag "$out/Tabel-full-setup.exe" "$out/Tabel-lite-setup.exe" "$out/version.json" --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Upload failed; release remains draft' }
+          gh release edit $tag --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot publish release' }

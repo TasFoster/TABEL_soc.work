@@ -114,6 +114,7 @@ class TimesheetWindow(tk.Toplevel):
 
         btns = ttk.Frame(self)
         btns.pack(fill="x", **pad)
+        ttk.Button(btns, text="Изменить отсутствие…", command=self._edit_absence).pack(side="left")
         ttk.Button(btns, text="+ Добавить отсутствие", command=self._add_absence).pack(side="left")
         ttk.Button(btns, text="− Убрать отсутствия у сотрудника", command=self._clear_absence).pack(
             side="left", padx=6
@@ -165,7 +166,9 @@ class TimesheetWindow(tk.Toplevel):
         self._on_context_change()
 
     def _on_context_change(self):
-        self.absences = {}
+        dept = self._current_dept()
+        year, month = self._current_year_month()
+        self.absences = storage.load_absences(dept, year, month) if dept else {}
         self._refresh_tree()
         self._check_calendar()
 
@@ -216,13 +219,44 @@ class TimesheetWindow(tk.Toplevel):
         self.wait_window(dlg)
         if dlg.result:
             self.absences.setdefault(emp["n"], []).append(dlg.result)
+            self._save_absences()
             self.tree.set(str(emp["n"]), "absence", self._absence_text(emp["n"]))
+
+    def _edit_absence(self):
+        from tkinter import simpledialog
+        emp = self._selected_emp()
+        if not emp:
+            return
+        items = self.absences.get(emp["n"], [])
+        if not items:
+            return
+        number = simpledialog.askinteger("Отсутствие", "Номер периода для изменения:\n" +
+            "\n".join(f"{i+1}. {a['code']}: {a['start']}–{a['end']}" for i,a in enumerate(items)),
+            parent=self, minvalue=1, maxvalue=len(items))
+        if number is None:
+            return
+        year, month = self._current_year_month()
+        old = items[number-1]
+        dlg = AbsenceDialog(self, emp["fio"], days_in_month(year, month), _absence_codes(self.settings))
+        dlg.start_var.set(old["start"])
+        dlg.end_var.set(old["end"])
+        dlg._cb.set(CODE_LABELS.get(old["code"], old["code"]))
+        self.wait_window(dlg)
+        if dlg.result:
+            items[number-1] = dlg.result
+            self._save_absences()
+            self._refresh_tree()
+
+    def _save_absences(self):
+        year, month = self._current_year_month()
+        storage.save_absences(self._current_dept(), year, month, self.absences)
 
     def _clear_absence(self):
         emp = self._selected_emp()
         if not emp:
             return
         if self.absences.pop(emp["n"], None) is not None:
+            self._save_absences()
             self.tree.set(str(emp["n"]), "absence", "")
 
     def _generate(self):

@@ -27,6 +27,8 @@ def generate(template_path, out_path, data, period_text=None):
     if os.path.exists(out_path):
         os.remove(out_path)
     wb.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path
 
 

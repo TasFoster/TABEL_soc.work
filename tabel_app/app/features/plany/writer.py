@@ -168,4 +168,6 @@ def generate(out_path, plan):
         doc.text.addElement(P(stylename=st["Sign"], text=line))
 
     doc.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path

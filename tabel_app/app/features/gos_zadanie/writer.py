@@ -195,4 +195,6 @@ def generate(out_path, ctx, clients, main_services, dop_services):
            f"Отчет о выполнении дополнительных услуг за {mn} {yr}",
            ctx, dop_services, clients, total_mode="sum")
     doc.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path

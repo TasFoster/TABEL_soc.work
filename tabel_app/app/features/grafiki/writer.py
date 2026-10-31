@@ -111,4 +111,6 @@ def generate(out_path, ctx, workers, weeks, marks):
     if os.path.exists(out_path):
         os.remove(out_path)
     wb.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path

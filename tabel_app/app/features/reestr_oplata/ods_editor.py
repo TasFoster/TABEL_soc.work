@@ -482,6 +482,8 @@ def save(m, out_path):
     if os.path.exists(out_path):
         os.remove(out_path)
     m.doc.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path
 
 

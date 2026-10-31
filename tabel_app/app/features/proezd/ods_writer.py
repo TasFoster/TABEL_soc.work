@@ -77,6 +77,8 @@ def generate(template_path, out_path, ctx, rows, keep_open=False):
     if os.path.exists(out_path):
         os.remove(out_path)
     doc.save(out_path)
+    from ...core.printing import remove_headers_footers
+    remove_headers_footers(out_path)
     return out_path
 
 

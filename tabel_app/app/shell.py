@@ -13,6 +13,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from .core import ui_state, updater_gui
+from .core.version import APP_VERSION
 from .core.clipboard import enable_hotkeys
 from .core.documents_gui import open_documents
 from .features.registry import get_features
@@ -27,7 +28,7 @@ ctk.set_default_color_theme("blue")
 class Shell(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title(APP_TITLE)
+        self.title(f"{APP_TITLE} — версия {APP_VERSION}")
         self.geometry("640x560")
         self.minsize(560, 440)
         # Копирование/вставка на русской раскладке (для всех окон программы).

@@ -1,7 +1,7 @@
 """Представление (View) функции «Проезд» — Tkinter.
 
 Тонкий слой: ввод/отображение и вызовы контроллера (service). Бизнес-логика
-(подготовка строк, даты по календарю, нормализация серий, цена, запись .ods) —
+(подготовка строк, даты из файла поездок, нормализация серий, цена, запись .ods) —
 в app/features/proezd/service.py."""
 
 import os
@@ -66,7 +66,6 @@ class ProezdWindow(tk.Toplevel):
         self.month_combo.pack(side="left", padx=4)
         ttk.Label(prm, text="Год:").pack(side="left", padx=(8, 0))
         tk.Spinbox(prm, from_=2024, to=2035, textvariable=self.year_var, width=6).pack(side="left", padx=4)
-        ttk.Button(prm, text="Проставить даты по месяцу", command=self._recalc_dates).pack(side="left", padx=10)
 
         nm = ttk.LabelFrame(self, text="Заявление — ФИО соцработника")
         nm.pack(fill="x", **pad)
@@ -223,14 +222,6 @@ class ProezdWindow(tk.Toplevel):
             + ("" if self._prepared["ocr_available"] else " (OCR недоступен)")
             + f"\n{note}")
         self.gen_btn.config(state="normal")
-
-    def _recalc_dates(self):
-        if not self.tree.get_children():
-            return
-        rows = self._collect_rows()
-        rows, note = service.reassign_dates(rows, self._selected_year(), self._selected_month())
-        self._fill_table(rows)
-        self.info_var.set(note)
 
     def _add_row(self):
         # вставка ПОСЛЕ выделенной строки (или в конец, если ничего не выделено)

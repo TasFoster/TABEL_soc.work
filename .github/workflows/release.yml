@@ -24,6 +24,7 @@ jobs:
       run:
         shell: pwsh
     env:
+      PYTHONUTF8: "1"
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:

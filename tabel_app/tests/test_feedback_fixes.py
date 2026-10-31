@@ -24,6 +24,17 @@ class FeedbackFixes(unittest.TestCase):
         for patcher in (patch.object(db, 'db_path', return_value=str(self.path/'test.db')),
                         patch.object(db, 'ensure_seeded')):
             patcher.start(); self.addCleanup(patcher.stop)
+        # sqlite3.Connection.__exit__ commits but does not close the handle.
+        original_connect = db.get_conn
+        connections = []
+        def connect():
+            connection = original_connect()
+            connections.append(connection)
+            return connection
+        connection_patch = patch.object(db, 'get_conn', side_effect=connect)
+        connection_patch.start()
+        self.addCleanup(connection_patch.stop)
+        self.addCleanup(lambda: [connection.close() for connection in connections])
         db.init_db()
         with db.get_conn() as c:
             c.execute("INSERT INTO departments(id,name,responsible_fio) VALUES(1,'ОСОД №2','Тестовая')")

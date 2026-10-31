@@ -199,6 +199,7 @@ def repeat_print_rows(workbook, first, last):
             raise ValueError("Print_Titles: книга уже содержит внешние ссылки")
         return (BIFFRecords.InternalReferenceSupBookRecord(1).get() +
                 BIFFRecords.ExternSheetRecord([(0, 0, 0)]).get() +
-                BIFFRecords.NameRecord(0x20, 0, 7, 1,
-                    b'\x3b' + struct.pack('<HHHHH', 0, first, last, 0, 255)).get())
+                struct.pack('<HH', 0x18, 27) +
+                struct.pack('<HBBHHHBBBBB', 0x20, 0, 1, 11, 0, 1, 0, 0, 0, 0, 0) +
+                b'\x07\x3b' + struct.pack('<HHHHH', 0, first, last, 0, 255))
     workbook._Workbook__all_links_rec = links

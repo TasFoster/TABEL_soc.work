@@ -64,31 +64,43 @@ def generate(template_path, out_path, context, keep_open=False):
             for c in range(sheet.ncols):
                 if (r, c) not in covered:
                     ws.write(target, c, sheet.cell_value(r, c), styles.cell_style(sheet, r, c))
+    merged_styles = {}
     for a, b, x, y in sheet.merged_cells:
         for target in destinations(a):
             style = styles.cell_style(sheet, a, x)
             if a == T_EMP_TOP and b == T_EMP_BOT + 1:
-                style = deepcopy(style)
-                style.borders.bottom = xlwt.Borders.THIN
+                key = sheet.cell_xf_index(a, x)
+                if key not in merged_styles:
+                    merged = deepcopy(style)
+                    merged.borders.bottom = xlwt.Borders.THIN
+                    merged_styles[key] = merged
+                style = merged_styles[key]
             ws.write_merge(target, target + b - a - 1, x, y - 1,
                            sheet.cell_value(a, x), style)
 
     day_by_col = {day_column(day): day for day in range(1, 32)}
     nonworking = set(context.get("nonworking_days", []))
 
+    # Кеш только на время одной генерации: нет зависимости от следующего месяца.
+    write_styles = {}
+
     def write(r, c, value, source=None):
         src = r if source is None else source
-        style = styles.cell_style(sheet, src, c)
-        if src == T_EMP_TOP and c in (0, 1, 3, 5):
-            style = deepcopy(style)
-            style.borders.bottom = xlwt.Borders.THIN
-        if src in (12, 13, T_EMP_TOP, T_EMP_BOT) and c in day_by_col:
-            style = deepcopy(style)
-            style.pattern = (solid_fill(weekend_colour)
-                             if day_by_col[c] in nonworking else xlwt.Pattern())
-        if src in (T_EMP_TOP, T_EMP_BOT) and c in (47, 48):
-            style = deepcopy(style)
-            style.alignment.wrap = True
+        key = (src, c)
+        style = write_styles.get(key)
+        if style is None:
+            style = styles.cell_style(sheet, src, c)
+            if src == T_EMP_TOP and c in (0, 1, 3, 5):
+                style = deepcopy(style)
+                style.borders.bottom = xlwt.Borders.THIN
+            if src in (12, 13, T_EMP_TOP, T_EMP_BOT) and c in day_by_col:
+                style = deepcopy(style)
+                style.pattern = (solid_fill(weekend_colour)
+                                 if day_by_col[c] in nonworking else xlwt.Pattern())
+            if src in (T_EMP_TOP, T_EMP_BOT) and c in (47, 48):
+                style = deepcopy(style)
+                style.alignment.wrap = True
+            write_styles[key] = style
         ws.write(r, c, value, style)
 
     write(5, 13, context.get("period_title", ""))

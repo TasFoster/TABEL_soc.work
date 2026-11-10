@@ -50,6 +50,7 @@ $pz = 'app/features/proezd'
 $ud = 'app/features/uslugi_dengi'
 $gz = 'app/features/gos_zadanie'
 $pl = 'app/features/plany'
+$pt = 'app/features/protokol'
 
 # Common args + data for the 3 always-present features.
 $common = @(
@@ -65,6 +66,8 @@ $common = @(
   '--add-data', "$ud/templates/uslugi_dengi_template.xlsx;features/uslugi_dengi/templates",
   '--add-data', "$gz/data/services_seed.json;features/gos_zadanie/data",
   '--add-data', "$pl/data/plany_templates.json;features/plany/data",
+  '--add-data', "$pt/data/plan.json;features/protokol/data",
+  '--add-data', "$pt/data/methodical_plans.json;features/protokol/data",
   '--hidden-import', 'xlrd', '--hidden-import', 'sqlite3',
   '--collect-submodules', 'xlwt', '--collect-submodules', 'odf',
   '--collect-submodules', 'openpyxl',

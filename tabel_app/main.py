@@ -348,9 +348,10 @@ def _selftest_release():
         from app.features.registry import get_features
         variant, expected_version = sys.argv[-2:]
         features = get_features()
-        expected = 10 if variant == "full" else 9
+        expected = 11 if variant == "full" else 10
         keys = [feature.key for feature in features]
-        if len(features) != expected or (("proezd" in keys) != (variant == "full")):
+        if (len(features) != expected or "protokol" not in keys
+                or (("proezd" in keys) != (variant == "full"))):
             raise RuntimeError(f"Unexpected features: {keys}")
         if version.APP_VERSION != expected_version or updater.variant_key() != variant:
             raise RuntimeError("Wrong embedded version or variant")
@@ -376,6 +377,22 @@ def _selftest_release():
                     raise RuntimeError("Wrong timesheet form or totals")
             finally:
                 book.release_resources()
+            from odf.opendocument import load
+            from odf.teletype import extractText
+            from odf.text import P
+            from app.features.protokol import service as protocol
+            from app.features.timesheet.calendar_ru import ProductionCalendar
+            dept = {"number": "9", "employees": []}
+            draft = protocol.new_draft(dept, 2026, 11, ProductionCalendar({}))
+            draft["people"] = [{"name": "Test", "present": True, "reason": ""}]
+            draft["other"] = "Test discussion"
+            out = os.path.join(tmp, "protocol.odt")
+            protocol.generate(out, dept, 2026, 11, draft)
+            paragraphs = [extractText(p) for p in load(out).getElementsByType(P)]
+            if not draft["planned_report"] or not all(
+                line in paragraphs for line in (draft["planned_report"], "Test discussion")
+            ):
+                raise RuntimeError("Protocol plan or document is missing")
         result = {"ok": True, "version": version.APP_VERSION, "variant": variant, "features": keys}
     except Exception:
         result["error"] = traceback.format_exc()

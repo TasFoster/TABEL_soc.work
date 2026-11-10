@@ -43,6 +43,7 @@ class DatabaseOptimizations(unittest.TestCase):
                  ('proezd', '2026-12-01', '{"month":12}', b'other')])
         self.assertEqual(documents.last_params('timesheet'), {'month':11})
         self.assertEqual(documents.last_params('missing'), {})
+        self.conn.execute("DROP INDEX idx_documents_feature_latest")
         db.init_db(self.conn); db.init_db(self.conn)
         self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM documents').fetchone()[0], 3)
         plan=str([tuple(r) for r in self.conn.execute('EXPLAIN QUERY PLAN SELECT params FROM documents WHERE feature=? ORDER BY created_at DESC,id DESC LIMIT 1', ('timesheet',))])

@@ -18,7 +18,7 @@ def get_calendar(settings=None):
     )
 
 
-def build_context(dept, year, month, absences_by_emp, settings=None, period=None):
+def build_context(dept, year, month, absences_by_emp, settings=None, period=None, indicators_by_emp=None):
     """Собрать контекст табеля.
 
     absences_by_emp: {employee_n: [{start, end, code}, ...]}.
@@ -51,6 +51,7 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
                 "worked_days": res["worked_days"],
                 "worked_hours": res["worked_hours"],
                 "reasons": res["reasons"],
+                "indicators": (indicators_by_emp or {}).get(emp["n"], {}),
             }
         )
 
@@ -82,5 +83,7 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
 
 def generate_timesheet(dept, year, month, absences_by_emp, out_path,
                        settings=None, keep_open=False, period=None):
-    context = build_context(dept, year, month, absences_by_emp, settings, period)
+    indicators = {emp["n"]: storage.load_indicators(emp, year, month, period)
+                  for emp in dept["employees"] if "_db_id" in emp}
+    context = build_context(dept, year, month, absences_by_emp, settings, period, indicators)
     return _generate(storage.template_path(), out_path, context, keep_open=keep_open)

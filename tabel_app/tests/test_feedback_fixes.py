@@ -111,3 +111,11 @@ class FeedbackFixes(unittest.TestCase):
         doc.spreadsheet.addElement(Table(name='test'))
         out=self.path/'print.ods';doc.save(str(out));remove_headers_footers(str(out))
         self.assertEqual(len(load(str(out)).masterstyles.getElementsByType(Header)),0)
+
+    def test_timesheet_indicators_persist_by_employee_and_period(self):
+        emp = {'_db_id': 1, 'n': 1}
+        ts.save_indicators(emp, 2026, 11, {'rate': 0.5, 'night_hours': 8}, (1, 15))
+        emp['n'] = 99
+        self.assertEqual(ts.load_indicators(emp, 2026, 11, (1, 15)), {'rate': 0.5, 'night_hours': 8})
+        self.assertEqual(ts.load_indicators(emp, 2026, 11), {})
+        self.assertEqual(ts.load_indicators(emp, 2026, 12, (1, 15)), {})

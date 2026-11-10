@@ -1,6 +1,7 @@
 """Графический интерфейс приложения «Табель» (Tkinter)."""
 
 import datetime
+import math
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -10,6 +11,7 @@ from ...core import documents, feedback, ui_state
 from .calendar_ru import MONTHS_NOM, month_title
 from .service import generate_timesheet
 from .timesheet import days_in_month, validate_absences
+from .indicators import FIELDS, parse_indicators
 
 CODE_LABELS = {
     "Б": "Б — больничный",
@@ -119,7 +121,7 @@ class TimesheetWindow(tk.Toplevel):
         ttk.Button(btns, text="− Убрать отсутствия у сотрудника", command=self._clear_absence).pack(
             side="left", padx=6
         )
-        ttk.Label(btns, text="(двойной клик по строке — добавить отсутствие)").pack(side="left", padx=10)
+        ttk.Button(btns, text="Ставка, праздничные, ночные…", command=self._edit_indicators).pack(side="left")
 
         bottom = ttk.Frame(self)
         bottom.pack(fill="x", **pad)
@@ -258,6 +260,21 @@ class TimesheetWindow(tk.Toplevel):
         if self.absences.pop(emp["n"], None) is not None:
             self._save_absences()
             self.tree.set(str(emp["n"]), "absence", "")
+
+    def _edit_indicators(self):
+        emp = self._selected_emp()
+        if not emp:
+            messagebox.showinfo("Показатели", "Выберите сотрудника в таблице.", parent=self)
+            return
+        year, month = self._current_year_month()
+        ndays = days_in_month(year, month)
+        period = self._selected_period(ndays)
+        start, end = period or (1, ndays)
+        values = storage.load_indicators(emp, year, month, period)
+        dialog = IndicatorsDialog(self, emp["fio"], year, month, start, end, values)
+        self.wait_window(dialog)
+        if dialog.result is not None:
+            storage.save_indicators(emp, year, month, dialog.result, period)
 
     def _generate(self):
         dept = self._current_dept()
@@ -660,7 +677,9 @@ class EmployeeEditor(tk.Toplevel):
             return
         oklad_raw = self.vars["oklad"].get().strip().replace(" ", "")
         try:
-            oklad = int(float(oklad_raw)) if oklad_raw else ""
+            oklad = float(oklad_raw.replace(",", ".")) if oklad_raw else ""
+            if oklad != "" and (not math.isfinite(oklad) or oklad < 0):
+                raise ValueError
         except ValueError:
             messagebox.showerror("Оклад", "Оклад должен быть числом.")
             return
@@ -848,3 +867,35 @@ def run():
     win = TimesheetWindow(root)
     win.protocol("WM_DELETE_WINDOW", root.destroy)
     root.mainloop()
+
+
+class IndicatorsDialog(tk.Toplevel):
+    def __init__(self, master, fio, year, month, start, end, values):
+        super().__init__(master)
+        self.title("Дополнительные показатели табеля")
+        self.transient(master)
+        self.grab_set()
+        self.result = None
+        self.period_days = end - start + 1
+        self.vars = {}
+        ttk.Label(self, text=f"{fio}\n{start}–{end}, {MONTHS_NOM[month]} {year}").grid(
+            row=0, column=0, columnspan=2, padx=10, pady=8)
+        for row, (key, label) in enumerate(FIELDS, 1):
+            ttk.Label(self, text=label).grid(row=row, column=0, sticky="w", padx=10, pady=4)
+            var = tk.StringVar(value=values.get(key, ""))
+            ttk.Entry(self, textvariable=var, width=15).grid(row=row, column=1, padx=10)
+            self.vars[key] = var
+        ttk.Label(self, text="Сохраняется для выбранного периода. Пустое поле — нет данных.\n"
+                  "Ставка и дополнительные показатели не меняют часы явок.").grid(
+            row=6, column=0, columnspan=2, padx=10, pady=8)
+        ttk.Button(self, text="Сохранить", command=self._save).grid(row=7, column=0, pady=8)
+        ttk.Button(self, text="Отмена", command=self.destroy).grid(row=7, column=1, pady=8)
+
+    def _save(self):
+        try:
+            result = parse_indicators({k: v.get() for k, v in self.vars.items()}, self.period_days)
+        except ValueError as error:
+            messagebox.showerror("Показатели", str(error), parent=self)
+            return
+        self.result = result
+        self.destroy()

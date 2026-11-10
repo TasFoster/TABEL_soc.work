@@ -15,7 +15,7 @@ SHEET_NAME = "Лист_1"
 T_HEADER_LAST = 13
 T_EMP_TOP, T_EMP_BOT = 14, 15
 T_TAIL_FIRST, T_TAIL_LAST = 16, 22
-C_HALF, C_TOTAL = 22, 41
+C_HALF, C_TOTAL = 21, 40
 
 
 class ExcelWriterError(Exception):
@@ -25,7 +25,7 @@ class ExcelWriterError(Exception):
 def day_column(day):
     if not 1 <= day <= 31:
         raise ValueError("День должен быть в диапазоне 1–31")
-    return 6 + day if day <= 15 else 9 + day
+    return 5 + day if day <= 15 else 8 + day
 
 
 def generate(template_path, out_path, context, keep_open=False):
@@ -86,14 +86,17 @@ def generate(template_path, out_path, context, keep_open=False):
             style = deepcopy(style)
             style.pattern = (solid_fill(weekend_colour)
                              if day_by_col[c] in nonworking else xlwt.Pattern())
+        if src in (T_EMP_TOP, T_EMP_BOT) and c in (47, 48):
+            style = deepcopy(style)
+            style.alignment.wrap = True
         ws.write(r, c, value, style)
 
-    write(5, 14, context.get("period_title", ""))
+    write(5, 13, context.get("period_title", ""))
     write(6, 5, context.get("organization", ""))
     write(7, 5, context.get("department_name", ""))
-    write(5, 39, context.get("report_date", ""))
-    write(9, 39, context.get("formation_date", ""))
-    write(8, 39, 0)  # первичный табель
+    write(5, 38, context.get("report_date", ""))
+    write(9, 38, context.get("formation_date", ""))
+    write(8, 38, 0)  # первичный табель
     for day in range(1, 32):
         c = day_column(day)
         write(12, c, str(day) if day <= context.get("ndays", 31) else "")
@@ -107,6 +110,22 @@ def generate(template_path, out_path, context, keep_open=False):
         for c, value in ((0, emp["n"]), (1, emp["fio"]),
                          (3, str(emp.get("tab_number", ""))), (5, emp.get("position", ""))):
             write(top, c, value, T_EMP_TOP)
+        write(top, 4, emp.get("oklad", ""), T_EMP_TOP)
+        indicators = emp.get("indicators", {})
+        write(bot, 4, indicators.get("rate", ""), T_EMP_BOT)
+        for col, prefix in ((45, "holiday"), (46, "night")):
+            write(top, col, indicators.get(prefix + "_days", ""), T_EMP_TOP)
+            write(bot, col, indicators.get(prefix + "_hours", ""), T_EMP_BOT)
+        reasons = emp.get("reasons", [])
+        for col, items in ((47, reasons[:1]), (48, reasons[1:])):
+            if not items:
+                continue
+            write(top, col, "\n".join(r["code"] for r in items), T_EMP_TOP)
+            write(bot, col, "\n".join(str(r["days"]) for r in items), T_EMP_BOT)
+            if len(items) > 1:
+                for row in (top, bot):
+                    ws.row(row).height = max(ws.row(row).height, len(items) * 240)
+                    ws.row(row).height_mismatch = True
         for day in range(1, 32):
             write(top, day_column(day), "", T_EMP_TOP)
             write(bot, day_column(day), "", T_EMP_BOT)
@@ -127,10 +146,10 @@ def generate(template_path, out_path, context, keep_open=False):
     # Кадровый ответственный и исполнитель отделения — разные подписи.
     for r, c, value in (
         (17, 3, context.get("timesheet_hr_position", "Начальник ОК")),
-        (17, 12, context.get("timesheet_hr_fio", "")),
+        (17, 11, context.get("timesheet_hr_fio", "")),
         (20, 3, context.get("responsible_position", "")),
-        (20, 12, context.get("responsible_fio", "")),
-        (19, 38, context.get("timesheet_accountant_fio", "")),
+        (20, 11, context.get("responsible_fio", "")),
+        (19, 37, context.get("timesheet_accountant_fio", "")),
     ):
         write(r + shift, c, value, r)
 

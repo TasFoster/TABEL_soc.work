@@ -373,7 +373,7 @@ def _selftest_release():
             book = xlrd.open_workbook(out)
             try:
                 sheet = book.sheet_by_index(0)
-                if sheet.cell_value(4, 39) != "0504421" or sheet.cell_value(15, 41) != 8:
+                if sheet.cell_value(4, 38) != "0504421" or sheet.cell_value(15, 40) != 8:
                     raise RuntimeError("Wrong timesheet form or totals")
             finally:
                 book.release_resources()

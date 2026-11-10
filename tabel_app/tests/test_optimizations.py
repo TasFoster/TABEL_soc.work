@@ -64,3 +64,39 @@ class DatabaseOptimizations(unittest.TestCase):
         self.assertEqual(values[1101],{'rate':0.5})
         self.assertEqual(len([q for q in queries if q.startswith('SELECT')]),2)
         self.assertEqual(storage.load_department_indicators(dept,2026,12),{})
+
+
+class OdsRepeatedRows(unittest.TestCase):
+    def test_large_repetition_remains_compressed_and_edits_are_independent(self):
+        from odf.table import Table, TableRow, TableCell
+        from odf.text import P
+        from app.features.reestr import ods_build as ob
+        table=Table(name='Test');row=TableRow(numberrowsrepeated=1000000)
+        cell=TableCell(valuetype='string');cell.addElement(P(text='original'))
+        row.addElement(cell);table.addElement(row)
+        middle=ob.row_at(table,500000)
+        self.assertEqual(len(table.childNodes),3)
+        self.assertEqual([rep for _,_,rep in ob.logical_rows(table)],[500000,1,499999])
+        ob.put_row(middle,{0:'changed'})
+        for index in (0,1,499999,500001,999999):
+            got=ob.row_at(table,index)
+            self.assertEqual(ob.cell_text(ob.logical_cells(got,0)[0]),'original')
+        self.assertIs(ob.row_at(table,500000),middle)
+        self.assertEqual(sum(rep for _,_,rep in ob.logical_rows(table)),1000000)
+        self.assertIsNone(ob.row_at(table,1000000))
+        self.assertLessEqual(len(table.childNodes),13)
+
+    def test_small_repetitions_and_nested_rows_preserve_neighbors(self):
+        from odf.table import Table, TableRow, TableCell, TableRowGroup
+        from odf.text import P
+        from app.features.reestr import ods_build as ob
+        for repeat in (2,3,10):
+            for wanted in range(repeat):
+                table=Table(name='Test');group=TableRowGroup();table.addElement(group)
+                row=TableRow(numberrowsrepeated=repeat);cell=TableCell();cell.addElement(P(text='x'))
+                row.addElement(cell);group.addElement(row)
+                target=ob.row_at(table,wanted)
+                self.assertIs(target.parentNode,group)
+                self.assertEqual(ob._row_rep(target),1)
+                self.assertEqual(sum(r for _,_,r in ob.logical_rows(table)),repeat)
+                self.assertEqual(ob.cell_text(ob.logical_cells(target,0)[0]),'x')

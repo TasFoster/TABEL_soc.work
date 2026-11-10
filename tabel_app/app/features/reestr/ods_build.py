@@ -86,15 +86,22 @@ def row_at(table, logical_idx):
 
 
 def _split_row(table, row, rep, want):
+    """Выделить одну строку, оставив префикс и хвост сжатыми (до трёх узлов)."""
+    parent = row.parentNode or table
     _del_attr(row, TABLENS, "number-rows-repeated")
-    rows = [row]
-    prev = row
-    for _ in range(rep - 1):
-        cl = _clone(row)
-        _insert_after(table, cl, prev)
-        rows.append(cl)
-        prev = cl
-    return rows[want]
+    target = row
+    if want:
+        target = _clone(row)
+        if want > 1:
+            row.setAttribute("numberrowsrepeated", str(want))
+        _insert_after(parent, target, row)
+    remaining = rep - want - 1
+    if remaining:
+        tail = _clone(target)
+        if remaining > 1:
+            tail.setAttribute("numberrowsrepeated", str(remaining))
+        _insert_after(parent, tail, target)
+    return target
 
 
 def remove_row(table, row):

@@ -37,7 +37,7 @@ def generate(template_path, out_path, context, keep_open=False):
         raise ExcelWriterError("Нет сотрудников для формирования табеля.")
     rb = xlrd.open_workbook(template_path, formatting_info=True)
     sheet = rb.sheet_by_name(SHEET_NAME)
-    wb = xlwt.Workbook(encoding="utf-8")
+    wb = xlwt.Workbook(encoding="utf-8", style_compression=2)
     ws = wb.add_sheet(SHEET_NAME, cell_overwrite_ok=True)
     palette = ColourPalette(wb)
     styles = TemplateStyles(rb, wb, palette)

@@ -688,10 +688,13 @@ class SettingsDialog(tk.Toplevel):
             ("director_label", "Подпись «Директор …»"),
             ("approve_line", "Строка «Утверждаю …»"),
             ("hr_specialist_line", "Строка «Специалист ОК …»"),
+            ("timesheet_hr_position", "Табель — должность ответственного ОК"),
+            ("timesheet_hr_fio", "Табель — ФИО ответственного ОК"),
+            ("timesheet_accountant_fio", "Табель — ФИО бухгалтера"),
         ]
         for i, (key, label) in enumerate(fields):
             ttk.Label(self, text=label).grid(row=i, column=0, sticky="w", padx=8, pady=4)
-            v = tk.StringVar(value=settings.get(key, ""))
+            v = tk.StringVar(value=settings.get(key, "Начальник ОК" if key == "timesheet_hr_position" else ""))
             ttk.Entry(self, textvariable=v, width=60).grid(row=i, column=1, padx=8, pady=4)
             self.vars[key] = v
 

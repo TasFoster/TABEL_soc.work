@@ -54,7 +54,7 @@ $pl = 'app/features/plany'
 # Common args + data for the 3 always-present features.
 $common = @(
   '--noconfirm', '--windowed', '--onefile', '--name', 'Tabel',
-  '--add-data', "$ts/templates/t13_template.xls;features/timesheet/templates",
+  '--add-data', "$ts/templates/f0504421_template.xls;features/timesheet/templates",
   '--add-data', "$ts/data/departments.json;features/timesheet/data",
   '--add-data', "$ts/data/settings.json;features/timesheet/data",
   '--add-data', "$ts/data/calendar.json;features/timesheet/data",

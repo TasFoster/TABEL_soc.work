@@ -72,7 +72,7 @@ class FeedbackFixes(unittest.TestCase):
         book=xlrd.open_workbook(str(out))
         title=next(n for n in book.name_obj_list if n.name=='Print_Titles')
         self.assertEqual(title.scope,0)
-        self.assertIn('$20',title.result.text)
+        self.assertIn('$14',title.result.text)
 
     def test_appendix_hidden_columns_and_second_signature(self):
         worker=pm.Worker(1,1,'Тестовый Сотрудник',30000,5,3)

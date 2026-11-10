@@ -3,7 +3,7 @@
 Отделения/сотрудники, реквизиты/подписи и производственный календарь теперь живут
 в единой базе (core.db) — тот же источник, что и у «Приложения к табелю». Форма
 данных, которую видит GUI, сохранена прежней (словари), поэтому окна функции не
-меняются. Шаблон Т-13 по-прежнему берётся из ресурсов через core.storage.
+меняются. Шаблон 0504421 по-прежнему берётся из ресурсов через core.storage.
 """
 
 import os
@@ -40,7 +40,7 @@ def save_calendar(obj):
 
 
 def template_path():
-    return _core.template_path(FEATURE, _PKG_DIR, "t13_template.xls")
+    return _core.template_path(FEATURE, _PKG_DIR, "f0504421_template.xls")
 
 
 def load_absences(dept, year, month):

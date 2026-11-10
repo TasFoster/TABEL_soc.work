@@ -360,6 +360,22 @@ def _selftest_release():
                 raise RuntimeError("OCR dependencies missing in full build")
             from winrt.windows.graphics.imaging import BitmapDecoder
             from winrt.windows.storage import StorageFile
+        # Проверяем новый ресурс и генерацию в обеих frozen-сборках, без БД.
+        import tempfile
+        import xlrd
+        from app.features.timesheet import storage as ts_storage, excel_writer
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "timesheet.xls")
+            excel_writer.generate(ts_storage.template_path(), out, {
+                "employees": [{"n": 1, "fio": "Test", "marks": {1: 8},
+                               "worked_days": 1, "worked_hours": 8}], "ndays": 30})
+            book = xlrd.open_workbook(out)
+            try:
+                sheet = book.sheet_by_index(0)
+                if sheet.cell_value(4, 39) != "0504421" or sheet.cell_value(15, 41) != 8:
+                    raise RuntimeError("Wrong timesheet form or totals")
+            finally:
+                book.release_resources()
         result = {"ok": True, "version": version.APP_VERSION, "variant": variant, "features": keys}
     except Exception:
         result["error"] = traceback.format_exc()

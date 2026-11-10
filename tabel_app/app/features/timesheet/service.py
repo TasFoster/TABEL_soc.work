@@ -23,7 +23,7 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
 
     absences_by_emp: {employee_n: [{start, end, code}, ...]}.
     period: None — весь месяц; (day_from, day_to) — половина месяца (заполняются
-    только дни периода, итоги/неявки — за период; форма Т-13 та же).
+    только дни периода, итоги/неявки — за период; форма 0504421 та же).
     """
     settings = settings or storage.load_settings()
     cal = get_calendar(settings)
@@ -54,7 +54,17 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
             }
         )
 
+    months = ("", "января", "февраля", "марта", "апреля", "мая", "июня",
+              "июля", "августа", "сентября", "октября", "ноября", "декабря")
     return {
+        "period_title": f"за период с {day_from} по {day_to} {months[month]} {year} г.",
+        "day_from": day_from,
+        "day_to": day_to,
+        "report_date": datetime.date(year, month, day_to).strftime("%d.%m.%Y"),
+        "formation_date": datetime.date.today().strftime("%d.%m.%Y"),
+        "timesheet_hr_position": settings.get("timesheet_hr_position", "Начальник ОК"),
+        "timesheet_hr_fio": settings.get("timesheet_hr_fio", ""),
+        "timesheet_accountant_fio": settings.get("timesheet_accountant_fio", ""),
         "organization": dept.get("organization", ""),
         "department_name": dept.get("name", ""),
         "month_title": month_title(month, year),

@@ -24,6 +24,7 @@ import glob
 import json
 import os
 import sqlite3
+from contextlib import closing
 
 from . import storage as _storage
 
@@ -172,6 +173,8 @@ CREATE TABLE IF NOT EXISTS documents (
     params     TEXT,               -- JSON параметров (период/отделение и т.п.)
     content    BLOB                -- содержимое файла
 );
+CREATE INDEX IF NOT EXISTS idx_documents_feature_latest
+    ON documents(feature, created_at DESC, id DESC);
 """
 
 
@@ -589,10 +592,11 @@ def _replace_employees(conn, dept_id, employees, match_by_fio):
 def _departments_to_dict(conn):
     out = []
     depts = conn.execute("SELECT * FROM departments ORDER BY sort_order, id").fetchall()
+    employees_by_department = {}
+    for emp in conn.execute("SELECT * FROM employees ORDER BY dept_id, sort_order, n, id"):
+        employees_by_department.setdefault(emp["dept_id"], []).append(emp)
     for d in depts:
-        emps = conn.execute(
-            "SELECT * FROM employees WHERE dept_id=? ORDER BY sort_order, n, id",
-            (d["id"],)).fetchall()
+        emps = employees_by_department.get(d["id"], [])
         out.append({
             "_db_id": d["id"],
             "id": d["ext_id"] or "",
@@ -864,6 +868,16 @@ def documents_add(feature, title, filename, params, content):
              datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
              json.dumps(params or {}, ensure_ascii=False), content))
         conn.commit()
+
+
+def documents_last_params(feature):
+    """Только параметры последнего документа функции, без загрузки всего архива."""
+    ensure_seeded()
+    with closing(get_conn()) as conn:
+        row = conn.execute(
+            "SELECT params FROM documents WHERE feature=? "
+            "ORDER BY created_at DESC, id DESC LIMIT 1", (feature,)).fetchone()
+    return row["params"] if row else None
 
 
 def documents_list():

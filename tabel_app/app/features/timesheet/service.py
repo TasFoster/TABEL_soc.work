@@ -83,7 +83,6 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
 
 def generate_timesheet(dept, year, month, absences_by_emp, out_path,
                        settings=None, keep_open=False, period=None):
-    indicators = {emp["n"]: storage.load_indicators(emp, year, month, period)
-                  for emp in dept["employees"] if "_db_id" in emp}
+    indicators = storage.load_department_indicators(dept, year, month, period)
     context = build_context(dept, year, month, absences_by_emp, settings, period, indicators)
     return _generate(storage.template_path(), out_path, context, keep_open=keep_open)

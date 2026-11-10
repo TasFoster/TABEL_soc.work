@@ -81,10 +81,7 @@ def params_brief(raw):
 
 def last_params(feature):
     """Параметры последнего (самого свежего) документа функции из архива или {}."""
-    for d in db.documents_list():   # отсортированы по дате DESC
-        if d.get("feature") == feature:
-            return parse_params(d.get("params"))
-    return {}
+    return parse_params(db.documents_last_params(feature))
 
 
 def extract_to_temp(doc_id):

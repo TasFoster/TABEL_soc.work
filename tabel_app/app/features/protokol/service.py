@@ -67,7 +67,7 @@ def validate(draft, year, month):
         raise ValueError("Добавьте хотя бы одного присутствующего.")
 
 
-def generate(path, department, year, month, draft):
+def document_data(department, year, month, draft):
     validate(draft, year, month)
     present = [p["name"] for p in draft["people"] if p["present"]]
     absent = [f'{p["name"]} — {p["reason"].strip().lower()}' if p["reason"].strip() else p["name"]
@@ -91,7 +91,7 @@ def generate(path, department, year, month, draft):
     body.extend(("", "Разное:", *draft["other"].splitlines()))
     context = {"number": draft["number"], "date": draft["date"],
                "dept_no": storage.department_number(department), "zav": draft["head"]}
-    return writer.generate(path, context, present, "\n".join(body), absent)
+    return context, present, "\n".join(body), absent
 
 
 def reports_from_plan(department, year, month):
@@ -100,3 +100,35 @@ def reports_from_plan(department, year, month):
     return "\n".join(row[1].strip() for section in plan.get("sections", [])
                      for row in section.get("rows", [])
                      if len(row) > 1 and "заслуш" in row[1].lower())
+
+
+def generate(path, department, year, month, draft):
+    return writer.generate(path, *document_data(department, year, month, draft))
+
+
+def preview(department, year, month, draft):
+    """Те же абзацы и стили, что в экспортируемом ODT, без записи файла."""
+    from odf.text import P
+    from odf.teletype import extractText
+    doc = writer.build_document(*document_data(department, year, month, draft))
+    return [(extractText(p), "title" if p.getAttribute("stylename") == "ProtTitle" else "body")
+            for p in doc.getElementsByType(P)]
+
+
+def compare_drafts(before, after):
+    """Построчные отличия всех пользовательских полей, включая участников."""
+    import difflib
+    labels = {"number": "Номер", "date": "Дата", "head": "Заведующая",
+              "speaker": "Замена докладчика", "agenda": "Повестка",
+              "planned_report": "Заслушивания", "decisions": "Решения", "other": "Разное"}
+    def lines(draft):
+        result = []
+        for key, label in labels.items():
+            result.append("[" + label + "]")
+            result.extend(str(draft.get(key, "")).splitlines())
+        result.append("[Участники]")
+        for person in draft.get("people", []):
+            result.append(f'{person["name"]} | {"Присутствует" if person["present"] else "Отсутствует"} | {person.get("reason", "")}')
+        return result
+    return list(difflib.unified_diff(lines(before), lines(after), fromfile="Исходная версия",
+                                    tofile="Сравниваемая версия", lineterm=""))

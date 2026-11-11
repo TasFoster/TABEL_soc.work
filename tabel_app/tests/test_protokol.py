@@ -82,3 +82,21 @@ class ProtocolTest(unittest.TestCase):
             self.assertEqual(len(entries), 2)
             self.assertEqual(sum(e["draft"]["agenda"] == "Изменение" for e in entries), 1)
             self.assertEqual(storage.load_history({"number": "9"}), [])
+
+    def test_preview_matches_export_and_comparison(self):
+        draft = {"number": "1", "date": "25.11.2026", "head": "Тестовая А. Б.",
+                 "speaker": "", "agenda": "Пункт", "planned_report": "Отчёт",
+                 "decisions": "Решение", "other": "Обсуждение",
+                 "people": [{"name": "Примеров А. Б.", "present": True, "reason": ""}]}
+        dept = {"number": "5"}
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "preview.odt"
+            service.generate(str(out), dept, 2026, 11, draft)
+            self.assertEqual([text for text, style in service.preview(dept, 2026, 11, draft)],
+                             [extractText(p) for p in load(str(out)).getElementsByType(P)])
+        self.assertEqual(service.compare_drafts(draft, draft), [])
+        changed = dict(draft, other="Новый текст", people=[])
+        diff = service.compare_drafts(draft, changed)
+        self.assertIn("-Обсуждение", diff)
+        self.assertIn("+Новый текст", diff)
+        self.assertTrue(any(line.startswith("-Примеров") for line in diff))

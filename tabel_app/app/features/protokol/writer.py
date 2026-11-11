@@ -67,7 +67,7 @@ def _add_p(doc, style, text=""):
     return p
 
 
-def generate(out_path, ctx, attendees, body, absentees=None):
+def build_document(ctx, attendees, body, absentees=None):
     """ctx: number, date, dept_no, zav. attendees/absentees: списки ФИО. body: текст повестки."""
     doc = OpenDocumentText()
     st = _styles(doc)
@@ -101,5 +101,9 @@ def generate(out_path, ctx, attendees, body, absentees=None):
     _add_p(doc, st["left"])
     _add_p(doc, st["left"], f"Зав.отделением №{dept_no}" + " " * 37 + zav)
 
-    doc.save(out_path)
+    return doc
+
+
+def generate(out_path, ctx, attendees, body, absentees=None):
+    build_document(ctx, attendees, body, absentees).save(out_path)
     return out_path

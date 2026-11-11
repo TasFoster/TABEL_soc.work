@@ -99,11 +99,37 @@ class ProtokolWindow(tk.Toplevel):
         ttk.Label(self, textvariable=self.status, wraplength=760).pack(fill="x", padx=8, pady=5)
         bottom = ttk.Frame(self, padding=8)
         bottom.pack(fill="x")
+        more = ttk.Frame(self, padding=(8, 0))
+        more.pack(fill="x")
+        ttk.Button(more, text="Предварительный просмотр", command=self._preview).pack(side="left")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
         ttk.Button(bottom, text="Сохранить историю", command=self._save_history).pack(side="left")
         ttk.Button(bottom, text="История", command=self._history).pack(side="left")
         ttk.Button(bottom, text="Сформировать ODT", command=self._generate).pack(side="right")
         ttk.Button(bottom, text="Сохранить черновик", command=self._save).pack(side="right", padx=6)
+
+    def _show_text(self, title, paragraphs, parent=None):
+        win = tk.Toplevel(parent or self)
+        win.title(title)
+        win.geometry("850x680")
+        win.transient(parent or self)
+        text = ScrolledText(win, wrap="word", font=("Times New Roman", 14), padx=30, pady=20)
+        text.pack(fill="both", expand=True)
+        text.tag_configure("title", justify="center", font=("Times New Roman", 14, "bold"))
+        text.tag_configure("removed", foreground="#9c2020", background="#ffecec")
+        text.tag_configure("added", foreground="#17652b", background="#eaffee")
+        for paragraph, style in paragraphs:
+            text.insert("end", paragraph + "\n", style)
+        text.configure(state="disabled")
+        ttk.Label(win, text="Просмотр содержания. Разбиение на страницы зависит от офисной программы.").pack(pady=5)
+
+    def _preview(self):
+        try:
+            paragraphs = service.preview(*self.context, self._read_draft())
+        except ValueError as exc:
+            messagebox.showwarning("Предварительный просмотр", str(exc), parent=self)
+            return
+        self._show_text("Предварительный просмотр протокола", paragraphs)
 
     def _refresh_plan(self):
         if not self.context:
@@ -139,13 +165,13 @@ class ProtokolWindow(tk.Toplevel):
         win.title("История — дублирование в открытый период")
         win.transient(self)
         win.grab_set()
-        listing = tk.Listbox(win, width=75, height=15, exportselection=False)
+        listing = tk.Listbox(win, width=75, height=15, exportselection=False, selectmode="extended")
         listing.pack(fill="both", expand=True, padx=8, pady=8)
         for entry in entries:
             listing.insert("end", f'{entry["created"]} — {entry["month"]:02d}.{entry["year"]} — № {entry["draft"]["number"]}')
 
         def duplicate():
-            if not listing.curselection() or not self._confirm_leave():
+            if len(listing.curselection()) != 1 or not self._confirm_leave():
                 return
             draft = entries[listing.curselection()[0]]["draft"]
             # Номер и дата остаются от целевого периода. Исходная версия неизменна.
@@ -159,7 +185,20 @@ class ProtokolWindow(tk.Toplevel):
             self._show_period("Версия скопирована. Проверьте данные и сохраните черновик.")
             win.destroy()
 
-        ttk.Button(win, text="Дублировать в текущий период", command=duplicate).pack(pady=8)
+        def compare():
+            selected = listing.curselection()
+            if len(selected) not in (1, 2):
+                messagebox.showinfo("Сравнение", "Выберите одну версию для сравнения с черновиком или две версии истории (Ctrl).", parent=win)
+                return
+            before = entries[selected[-1]]["draft"]
+            after = entries[selected[0]]["draft"] if len(selected) == 2 else self._read_draft()
+            changes = service.compare_drafts(before, after)
+            self._show_text("Сравнение версий", [(line, "removed" if line.startswith("-") else "added" if line.startswith("+") else "body")
+                                               for line in changes] or [("Отличий нет.", "body")], parent=win)
+
+        ttk.Label(win, text="Одна версия — сравнить с черновиком. Две (Ctrl) — между собой. Минус: исходная, плюс: новая.").pack(padx=8)
+        ttk.Button(win, text="Сравнить", command=compare).pack(pady=4)
+        ttk.Button(win, text="Дублировать одну версию в текущий период", command=duplicate).pack(pady=8)
 
     def _text_field(self, parent, key, height):
         field = ScrolledText(parent, wrap="word", height=height)

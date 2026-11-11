@@ -18,6 +18,7 @@ class ProtocolTransferTest(unittest.TestCase):
             with sqlite3.connect(db.db_path()) as conn:
                 conn.execute('CREATE TABLE departments (id INTEGER)')
                 conn.execute('INSERT INTO departments VALUES (7)')
+            conn.close()
             folder = data / 'protokol'
             folder.mkdir()
             draft = folder / 'draft_db_7_2026_11.json'
@@ -36,6 +37,7 @@ class ProtocolTransferTest(unittest.TestCase):
             legacy = Path(directory) / 'legacy.db'
             with sqlite3.connect(legacy) as conn:
                 conn.execute('CREATE TABLE departments (id INTEGER)')
+            conn.close()
             db.import_db(str(legacy))
             self.assertTrue(history.exists())
             db.import_db(backup)
@@ -50,6 +52,7 @@ class ProtocolTransferTest(unittest.TestCase):
                 conn.execute('CREATE TABLE departments (id INTEGER)')
                 conn.execute('CREATE TABLE transfer_files (name TEXT, content BLOB)')
                 conn.execute('INSERT INTO transfer_files VALUES (?, ?)', ('../escape.json', b'{}'))
+            conn.close()
             with self.assertRaises(ValueError):
                 db.import_db(str(source))
             self.assertFalse(Path(db.db_path()).exists())

@@ -64,3 +64,20 @@ def load_draft(department, year, month):
 
 def save_draft(department, year, month, draft):
     storage.save_json(FEATURE, _draft_filename(department, year, month), draft)
+
+
+def save_history(department, year, month, draft):
+    from datetime import datetime
+    from uuid import uuid4
+    entry = {"department": department_number(department), "year": year, "month": month,
+             "created": datetime.now().isoformat(timespec="seconds"), "draft": draft}
+    storage.save_json(FEATURE, "history_" + uuid4().hex + ".json", entry)
+
+
+def load_history(department):
+    entries = []
+    for path in Path(storage.feature_data_dir(FEATURE)).glob("history_*.json"):
+        entry = json.loads(path.read_text(encoding="utf-8"))
+        if entry["department"] == department_number(department):
+            entries.append(entry)
+    return sorted(entries, key=lambda entry: entry["created"], reverse=True)

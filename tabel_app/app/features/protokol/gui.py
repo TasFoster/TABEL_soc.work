@@ -81,8 +81,9 @@ class ProtokolWindow(tk.Toplevel):
         tabs.add(agenda, text="Повестка и докладчик")
         ttk.Label(agenda, text="Повестка из плана методического часа, по одному пункту на строку").pack(anchor="w")
         self._text_field(agenda, "agenda", 5)
-        ttk.Label(agenda, text="Тема и докладчик из плана (формулировку можно изменить)").pack(anchor="w")
+        ttk.Label(agenda, text="Заслушиваемые работники из плана — редактируйте, добавляйте и удаляйте строки").pack(anchor="w")
         self._text_field(agenda, "planned_report", 3)
+        ttk.Button(agenda, text="Обновить заслушивания из плана", command=self._refresh_plan).pack(anchor="w")
         ttk.Label(agenda, text="Замена докладчика (выберите сотрудника или впишите ФИО)").pack(anchor="w")
         self.speaker_box = ttk.Combobox(agenda, textvariable=self.speaker)
         self.speaker_box.pack(fill="x")
@@ -99,8 +100,66 @@ class ProtokolWindow(tk.Toplevel):
         bottom = ttk.Frame(self, padding=8)
         bottom.pack(fill="x")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
+        ttk.Button(bottom, text="Сохранить историю", command=self._save_history).pack(side="left")
+        ttk.Button(bottom, text="История", command=self._history).pack(side="left")
         ttk.Button(bottom, text="Сформировать ODT", command=self._generate).pack(side="right")
         ttk.Button(bottom, text="Сохранить черновик", command=self._save).pack(side="right", padx=6)
+
+    def _refresh_plan(self):
+        if not self.context:
+            return
+        if not messagebox.askyesno("План", "Заменить список заслушиваний данными текущего плана?", parent=self):
+            return
+        try:
+            report = service.reports_from_plan(*self.context)
+        except Exception as exc:
+            messagebox.showerror("План", str(exc), parent=self)
+            return
+        field = self.fields["planned_report"]
+        field.delete("1.0", "end")
+        field.insert("1.0", report)
+        self.speaker.set("")
+        self._show_period("Заслушивания обновлены из плана." if report else "В плане нет строк заслушивания.")
+
+    def _save_history(self):
+        try:
+            storage.save_history(*self.context, self._read_draft())
+        except OSError as exc:
+            messagebox.showerror("История", str(exc), parent=self)
+            return
+        self._show_period("Версия сохранена в истории.")
+
+    def _history(self):
+        try:
+            entries = storage.load_history(self.context[0])
+        except (OSError, ValueError, KeyError) as exc:
+            messagebox.showerror("История", str(exc), parent=self)
+            return
+        win = tk.Toplevel(self)
+        win.title("История — дублирование в открытый период")
+        win.transient(self)
+        win.grab_set()
+        listing = tk.Listbox(win, width=75, height=15, exportselection=False)
+        listing.pack(fill="both", expand=True, padx=8, pady=8)
+        for entry in entries:
+            listing.insert("end", f'{entry["created"]} — {entry["month"]:02d}.{entry["year"]} — № {entry["draft"]["number"]}')
+
+        def duplicate():
+            if not listing.curselection() or not self._confirm_leave():
+                return
+            draft = entries[listing.curselection()[0]]["draft"]
+            # Номер и дата остаются от целевого периода. Исходная версия неизменна.
+            self.people = [dict(p) for p in draft["people"]]
+            self.head.set(draft["head"])
+            self.speaker.set(draft["speaker"])
+            for key, field in self.fields.items():
+                field.delete("1.0", "end")
+                field.insert("1.0", draft[key])
+            self._refresh_people()
+            self._show_period("Версия скопирована. Проверьте данные и сохраните черновик.")
+            win.destroy()
+
+        ttk.Button(win, text="Дублировать в текущий период", command=duplicate).pack(pady=8)
 
     def _text_field(self, parent, key, height):
         field = ScrolledText(parent, wrap="word", height=height)

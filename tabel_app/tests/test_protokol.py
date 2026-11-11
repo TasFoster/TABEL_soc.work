@@ -31,7 +31,7 @@ class ProtocolTest(unittest.TestCase):
             self.assertEqual(set(plans[department]), {str(n) for n in range(1, 13)})
         first = service.new_draft({"number": "5", "employees": []}, 2026, 8, ProductionCalendar({}))
         second = service.new_draft({"number": "9", "employees": []}, 2026, 8, ProductionCalendar({}))
-        self.assertTrue(first["planned_report"].startswith("Отчёт социального работника "))
+        self.assertIn("заслуш", first["planned_report"].lower())
         self.assertNotEqual(first["planned_report"], second["planned_report"])
 
     def test_draft_and_export_preserve_edited_rows(self):
@@ -41,6 +41,7 @@ class ProtocolTest(unittest.TestCase):
         draft.update(speaker="Примерова Анна Сергеевна", other="Согласовали график\nУточнили сроки",
                      people=[{"name": "Примерова Анна Сергеевна", "present": True, "reason": ""},
                              {"name": "Тестовый Иван Иванович", "present": False, "reason": "Отпуск"}])
+        draft["planned_report"] = "Отчёт социального работника Тестовой А. Б."
         original_speaker = draft["planned_report"]
         with tempfile.TemporaryDirectory() as directory, patch(
             "app.core.storage.app_base_dir", return_value=directory
@@ -62,3 +63,22 @@ class ProtocolTest(unittest.TestCase):
             service.generate(str(out), dept, 2026, 11, reloaded)
             lines = [extractText(p) for p in load(str(out)).getElementsByType(P)]
             self.assertIn(original_speaker, lines)
+
+
+    def test_current_plan_and_history(self):
+        dept = {"number": "5", "employees": []}
+        plan = {"sections": [{"rows": [["1", "Заслушивание отчёта Тестовой А. Б."],
+                                       ["2", "Заслушивание отчёта Примерова В. Г."],
+                                       ["3", "Другой пункт"]]}]}
+        with patch.object(service.plans, "build_plan", return_value=plan) as build:
+            draft = service.new_draft(dept, 2026, 11, ProductionCalendar({}))
+            build.assert_called_once_with("5", 11, 2026)
+            self.assertEqual(len(draft["planned_report"].splitlines()), 2)
+        with tempfile.TemporaryDirectory() as directory, patch("app.core.storage.app_base_dir", return_value=directory):
+            storage.save_history(dept, 2026, 11, draft)
+            draft["agenda"] = "Изменение"
+            storage.save_history(dept, 2026, 11, draft)
+            entries = storage.load_history(dept)
+            self.assertEqual(len(entries), 2)
+            self.assertEqual(sum(e["draft"]["agenda"] == "Изменение" for e in entries), 1)
+            self.assertEqual(storage.load_history({"number": "9"}), [])

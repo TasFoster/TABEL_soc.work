@@ -390,7 +390,7 @@ def _selftest_release():
             protocol.generate(out, dept, 2026, 11, draft)
             paragraphs = [extractText(p) for p in load(out).getElementsByType(P)]
             if not draft["planned_report"] or not all(
-                line in paragraphs for line in (draft["planned_report"], "Test discussion")
+                line in paragraphs for line in (*draft["planned_report"].splitlines(), "Test discussion")
             ):
                 raise RuntimeError("Protocol plan or document is missing")
         result = {"ok": True, "version": version.APP_VERSION, "variant": variant, "features": keys}

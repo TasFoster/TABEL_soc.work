@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 import re
 
 from . import storage, writer
+from ..plany import service as plans
 from ..timesheet.calendar_ru import MONTHS_NOM
 
 REASONS = ("", "Отпуск", "Больничный", "Другая причина")
@@ -37,6 +38,7 @@ def _plan_for(department, year, month):
 def new_draft(department, year, month, production_calendar):
     meeting = last_working_wednesday(year, month, production_calendar)
     agenda, report = _plan_for(department, year, month)
+    report = reports_from_plan(department, year, month)
     return {
         "number": str(month),
         "date": meeting.strftime("%d.%m.%Y") if meeting else "",
@@ -76,13 +78,13 @@ def generate(path, department, year, month, draft):
     if speaker and report.startswith("Отчёт социального работника "):
         report = "Отчёт социального работника."
     if report:
-        agenda.append(report)
+        agenda.extend(report.splitlines())
     agenda.append("Разное.")
     body = ["Повестка дня:", *(f"{i}. {line}" for i, line in enumerate(agenda, 1))]
     if speaker or report or draft["decisions"].strip():
         body.extend(("", "Слушали:"))
         if report:
-            body.append(report)
+            body.extend(report.splitlines())
         if speaker:
             body.append(f"Докладчик: {speaker}.")
         body.extend(draft["decisions"].splitlines())
@@ -90,3 +92,11 @@ def generate(path, department, year, month, draft):
     context = {"number": draft["number"], "date": draft["date"],
                "dept_no": storage.department_number(department), "zav": draft["head"]}
     return writer.generate(path, context, present, "\n".join(body), absent)
+
+
+def reports_from_plan(department, year, month):
+    """Берём фактические строки заслушивания, включая правки в «Планах»."""
+    plan = plans.build_plan(storage.department_number(department), month, year)
+    return "\n".join(row[1].strip() for section in plan.get("sections", [])
+                     for row in section.get("rows", [])
+                     if len(row) > 1 and "заслуш" in row[1].lower())

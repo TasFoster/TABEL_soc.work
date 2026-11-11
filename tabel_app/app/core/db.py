@@ -188,6 +188,26 @@ def backup_dir():
     return d
 
 
+def _embed_protocol_files(connection):
+    """Дополнительные JSON хранятся внутри переносимой копии SQLite."""
+    from pathlib import Path
+    connection.execute("CREATE TABLE IF NOT EXISTS transfer_files (name TEXT PRIMARY KEY, content BLOB NOT NULL)")
+    connection.execute("DELETE FROM transfer_files")
+    folder = Path(_storage.app_base_dir()) / "data" / "protokol"
+    for pattern in ("draft_*.json", "history_*.json"):
+        for path in folder.glob(pattern):
+            connection.execute("INSERT INTO transfer_files VALUES (?, ?)", (path.name, path.read_bytes()))
+    connection.commit()
+
+
+def _snapshot(dest):
+    import contextlib
+    with contextlib.closing(sqlite3.connect(db_path())) as source:
+        with contextlib.closing(sqlite3.connect(dest)) as target:
+            source.backup(target)
+            _embed_protocol_files(target)
+
+
 def backup_db(keep=10):
     """Сделать резервную копию app.db (если есть) в data/backups с ротацией (последние keep).
 
@@ -196,21 +216,14 @@ def backup_db(keep=10):
     src = db_path()
     if not os.path.exists(src) or os.path.getsize(src) == 0:
         return None
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     dest = os.path.join(backup_dir(), f"app-{stamp}.db")
     try:
-        src_conn = sqlite3.connect(src)
-        dst_conn = sqlite3.connect(dest)
-        with dst_conn:
-            src_conn.backup(dst_conn)   # безопасно даже при открытых соединениях
-        dst_conn.close()
-        src_conn.close()
-    except Exception:  # noqa: BLE001 — запасной путь: простое копирование файла
-        try:
-            import shutil
-            shutil.copy2(src, dest)
-        except Exception:  # noqa: BLE001
-            return None
+        _snapshot(dest)
+    except Exception:
+        if os.path.exists(dest):
+            os.remove(dest)
+        return None
     files = sorted(glob.glob(os.path.join(backup_dir(), "app-*.db")))
     for old in files[:-keep]:
         try:
@@ -221,24 +234,75 @@ def backup_db(keep=10):
 
 
 def export_db(dest):
-    """Сохранить копию базы (все данные приложения) в файл dest — для переноса на другой ПК."""
+    """Единая копия базы, черновиков и истории протоколов."""
     ensure_seeded()
-    import shutil
-    shutil.copy2(db_path(), dest)
+    if os.path.realpath(dest) == os.path.realpath(db_path()):
+        raise ValueError("Выберите отдельный файл для экспорта.")
+    import tempfile
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(dest)), suffix=".db")
+    os.close(fd)
+    try:
+        _snapshot(temporary)
+        os.replace(temporary, dest)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
     return dest
 
 
 def import_db(src):
-    """Заменить текущую базу файлом src (с предварительным бэкапом). Проверяет, что это
-    база «Табеля». После импорта рекомендуется перезапустить программу."""
-    test = sqlite3.connect(src)
+    """Проверить комплект, сохранить текущие данные и заменить с откатом при ошибке."""
+    import re
+    import shutil
+    import tempfile
+    from pathlib import Path
+    if os.path.realpath(src) == os.path.realpath(db_path()):
+        raise ValueError("Нельзя импортировать рабочую базу в саму себя.")
+    test = sqlite3.connect(Path(src).resolve().as_uri() + "?mode=ro", uri=True)
     try:
-        test.execute("SELECT 1 FROM departments LIMIT 1")  # бросит, если это не наша база
+        if test.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise ValueError("Повреждённая база данных.")
+        test.execute("SELECT 1 FROM departments LIMIT 1")
+        bundled = test.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='transfer_files'").fetchone()
+        files = test.execute("SELECT name, content FROM transfer_files").fetchall() if bundled else []
+        for name, content in files:
+            if not re.fullmatch(r"(?:draft_[A-Za-z0-9_]+|history_[a-f0-9]+)\.json", name):
+                raise ValueError("Недопустимое имя файла в копии.")
+            json.loads(content)
     finally:
         test.close()
-    backup_db()  # резервная копия текущей базы перед заменой
-    import shutil
-    shutil.copy2(src, db_path())
+    if os.path.exists(db_path()) and backup_db() is None:
+        raise OSError("Не удалось создать резервную копию. Импорт отменён.")
+    folder = Path(_storage.feature_data_dir("protokol"))
+    # Старые .db не содержат комплект JSON: сохраняем имеющиеся протоколы.
+    with tempfile.TemporaryDirectory(dir=Path(db_path()).parent) as temp:
+        temp = Path(temp)
+        staged = temp / "incoming.db"
+        shutil.copy2(src, staged)
+        old_db = temp / "previous.db"
+        had_db = os.path.exists(db_path())
+        if had_db:
+            shutil.copy2(db_path(), old_db)
+        old_files = {p.name: p.read_bytes() for pattern in ("draft_*.json", "history_*.json") for p in folder.glob(pattern)}
+        try:
+            if bundled:
+                for name in old_files:
+                    (folder / name).unlink()
+                for name, content in files:
+                    (folder / name).write_bytes(content)
+            os.replace(staged, db_path())
+        except Exception:
+            if bundled:
+                for pattern in ("draft_*.json", "history_*.json"):
+                    for path in folder.glob(pattern):
+                        path.unlink()
+                for name, content in old_files.items():
+                    (folder / name).write_bytes(content)
+            if had_db:
+                os.replace(old_db, db_path())
+            raise
+    global _ENSURED
+    _ENSURED = False
     return True
 
 

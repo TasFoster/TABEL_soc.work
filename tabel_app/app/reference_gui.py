@@ -82,12 +82,12 @@ class ReferenceWindow(tk.Toplevel):
         import os
         win = tk.Toplevel(self)
         win.title("Экспорт / импорт данных")
-        win.geometry("440x170")
+        win.geometry("480x230")
         win.transient(self)
         win.grab_set()
         ttk.Label(win, wraplength=410, justify="left",
                   text=("Перенос всех данных между компьютерами одним файлом базы "
-                        "(отделения, сотрудники, клиенты, нагрузки, календарь, настройки).")
+                        "(отделения, сотрудники, клиенты, нагрузки, календарь, настройки, черновики и история протоколов).")
                   ).pack(fill="x", padx=12, pady=(12, 8))
 
         def do_export():

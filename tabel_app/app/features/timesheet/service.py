@@ -18,13 +18,15 @@ def get_calendar(settings=None):
     )
 
 
-def build_context(dept, year, month, absences_by_emp, settings=None, period=None, indicators_by_emp=None):
+def build_context(dept, year, month, absences_by_emp, settings=None, period=None, indicators_by_emp=None, correction_number=0):
     """Собрать контекст табеля.
 
     absences_by_emp: {employee_n: [{start, end, code}, ...]}.
     period: None — весь месяц; (day_from, day_to) — половина месяца (заполняются
     только дни периода, итоги/неявки — за период; форма 0504421 та же).
     """
+    if isinstance(correction_number, bool) or not isinstance(correction_number, int) or correction_number < 0:
+        raise ValueError("Номер корректировки должен быть целым неотрицательным числом.")
     settings = settings or storage.load_settings()
     cal = get_calendar(settings)
 
@@ -61,10 +63,11 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
         "period_title": f"за период с {day_from} по {day_to} {months[month]} {year} г.",
         "day_from": day_from,
         "day_to": day_to,
-        "report_date": datetime.date(year, month, day_to).strftime("%d.%m.%Y"),
-        "formation_date": datetime.date.today().strftime("%d.%m.%Y"),
+        "report_date": "",
+        "formation_date": "",
         "timesheet_hr_position": settings.get("timesheet_hr_position", "Начальник ОК"),
-        "timesheet_hr_fio": settings.get("timesheet_hr_fio", ""),
+        "timesheet_hr_fio": settings.get("timesheet_hr_fio") or "Н.В. Кечина",
+        "correction_number": correction_number,
         "timesheet_accountant_fio": settings.get("timesheet_accountant_fio", ""),
         "organization": dept.get("organization", ""),
         "department_name": dept.get("name", ""),
@@ -82,7 +85,7 @@ def build_context(dept, year, month, absences_by_emp, settings=None, period=None
 
 
 def generate_timesheet(dept, year, month, absences_by_emp, out_path,
-                       settings=None, keep_open=False, period=None):
+                       settings=None, keep_open=False, period=None, correction_number=0):
     indicators = storage.load_department_indicators(dept, year, month, period)
-    context = build_context(dept, year, month, absences_by_emp, settings, period, indicators)
+    context = build_context(dept, year, month, absences_by_emp, settings, period, indicators, correction_number)
     return _generate(storage.template_path(), out_path, context, keep_open=keep_open)

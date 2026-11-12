@@ -45,7 +45,7 @@ class TimesheetFormTests(unittest.TestCase):
         self.assertEqual(s.cell_value(15, 8), 'Я')
         self.assertEqual(s.cell_value(14, 9), '')
         self.assertEqual(s.cell_value(15, 9), 'В')
-        self.assertEqual(s.cell_value(19, 26), 'ОТ')
+        self.assertEqual(s.cell_value(19, 26), 'О')
         self.assertEqual(s.cell_value(19, 33), 'Б')
         self.assertEqual(s.cell_value(12, 39), '')  # 31 ноября не существует
         self.assertEqual(s.cell_value(21, 11), 'Кадровик Т. Т.')
@@ -121,7 +121,7 @@ class TimesheetFormTests(unittest.TestCase):
         self.assertEqual([s.cell_value(r, 45) for r in (14, 15)], [1, 4])
         self.assertEqual([s.cell_value(r, 46) for r in (14, 15)], [2, 6.5])
         self.assertEqual([s.cell_value(r, 47) for r in (14, 15)], ['Б', '2'])
-        self.assertEqual([s.cell_value(r, 48) for r in (14, 15)], ['ОТ\nОЖ', '3\n4'])
+        self.assertEqual([s.cell_value(r, 48) for r in (14, 15)], ['О\nОЖ', '3\n4'])
 
     def test_indicator_validation(self):
         from app.features.timesheet.indicators import parse_indicators
@@ -132,3 +132,28 @@ class TimesheetFormTests(unittest.TestCase):
                        {'holiday_days': '16'}, {'night_hours': '361'}):
             with self.assertRaises(ValueError):
                 parse_indicators(values, 15)
+
+
+    def test_feedback_dates_and_correction(self):
+        book, ctx = self.generate(count=1)
+        sheet = book.sheet_by_index(0)
+        self.assertEqual(sheet.cell_value(5, 38), '')
+        self.assertEqual(sheet.cell_value(9, 38), '')
+        self.assertEqual(sheet.cell_value(8, 38), 0)
+        dept = {'employees': [], 'name': 'Тест'}
+        with patch.object(service, 'get_calendar', return_value=ProductionCalendar({})):
+            for number in (0, 1, 2, 10):
+                context = service.build_context(dept, 2026, 11, {}, {'workday_hours': 8}, correction_number=number)
+                self.assertEqual(context['correction_number'], number)
+                self.assertEqual(context['timesheet_hr_fio'], 'Н.В. Кечина')
+                self.assertEqual(context['timesheet_hr_position'], 'Начальник ОК')
+            for invalid in (-1, 1.5, '2', True):
+                with self.assertRaises(ValueError):
+                    service.build_context(dept, 2026, 11, {}, correction_number=invalid)
+        ctx['correction_number'] = 2
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory) / 'correction.xls'
+            excel_writer.generate(storage.template_path(), str(out), ctx)
+            b = xlrd.open_workbook(str(out))
+            self.assertEqual(b.sheet_by_index(0).cell_value(8, 38), 2)
+            b.release_resources()

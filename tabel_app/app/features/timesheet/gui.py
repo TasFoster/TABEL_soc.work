@@ -14,8 +14,9 @@ from .timesheet import days_in_month, validate_absences
 from .indicators import FIELDS, parse_indicators
 
 CODE_LABELS = {
+    "ОТ": "О — отпуск",
     "Б": "Б — больничный",
-    "ОТ": "ОТ — отпуск",
+    "О": "О — отпуск",
     "ОЖ": "ОЖ — отпуск по уходу за ребёнком",
 }
 
@@ -24,8 +25,10 @@ def _absence_codes(settings):
     codes = []
     for c in settings.get("absence_codes", []):
         if c.get("counts_as_absence"):
-            codes.append(c["code"])
-    return codes or ["Б", "ОТ", "ОЖ"]
+            code = "О" if c["code"] == "ОТ" else c["code"]
+            if code not in codes:
+                codes.append(code)
+    return codes or ["Б", "О", "ОЖ"]
 
 
 class TimesheetWindow(tk.Toplevel):
@@ -94,6 +97,20 @@ class TimesheetWindow(tk.Toplevel):
             ttk.Radiobutton(pf, text=txt, value=val, variable=self.period_var).pack(
                 side="left", padx=(6, 0))
 
+        report = ttk.Frame(top)
+        report.grid(row=4, column=1, sticky="w", padx=6, pady=6)
+        self.report_kind = tk.StringVar(value="Первичный")
+        self.correction_number = tk.StringVar(value="1")
+        ttk.Label(report, text="Вид табеля:").pack(side="left")
+        kind = ttk.Combobox(report, textvariable=self.report_kind, state="readonly",
+                            values=("Первичный", "Корректирующий"), width=18)
+        kind.pack(side="left", padx=6)
+        ttk.Label(report, text="№ корректировки").pack(side="left")
+        correction = ttk.Spinbox(report, from_=1, to=9999, textvariable=self.correction_number, width=6, state="disabled")
+        correction.pack(side="left", padx=6)
+        kind.bind("<<ComboboxSelected>>", lambda event: correction.configure(
+            state="normal" if self.report_kind.get() == "Корректирующий" else "disabled"))
+
         # Таблица сотрудников и отсутствий
         mid = ttk.LabelFrame(self, text="Сотрудники и отсутствия")
         mid.pack(fill="both", expand=True, **pad)
@@ -103,7 +120,7 @@ class TimesheetWindow(tk.Toplevel):
         self.tree.heading("n", text="№")
         self.tree.heading("fio", text="Фамилия, имя, отчество")
         self.tree.heading("position", text="Должность")
-        self.tree.heading("absence", text="Отсутствия (Б/ОТ/ОЖ)")
+        self.tree.heading("absence", text="Отсутствия (Б/О/ОЖ)")
         self.tree.column("n", width=40, anchor="center")
         self.tree.column("fio", width=320)
         self.tree.column("position", width=160)
@@ -196,7 +213,7 @@ class TimesheetWindow(tk.Toplevel):
 
     def _absence_text(self, n):
         items = self.absences.get(n, [])
-        return "; ".join(f"{a['code']}: {a['start']}–{a['end']}" for a in items)
+        return "; ".join(f"{'О' if a['code'] == 'ОТ' else a['code']}: {a['start']}–{a['end']}" for a in items)
 
     def _selected_emp(self):
         sel = self.tree.selection()
@@ -294,10 +311,21 @@ class TimesheetWindow(tk.Toplevel):
                 messagebox.showerror("Ошибка в периодах", f"{emp['fio']}:\n" + "\n".join(errs))
                 return
 
+        correction_number = 0
+        if self.report_kind.get() == "Корректирующий":
+            try:
+                correction_number = int(self.correction_number.get())
+                if correction_number < 1:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Номер корректировки", "Введите целое число от 1.", parent=self)
+                return
         period = self._selected_period(ndays)
         suffix = {"first": "_1-15", "second": "_16-конец"}.get(self.period_var.get(), "")
         default_name = (f"Табель_{dept['name'].split('№')[-1].strip()}_"
                         f"{MONTHS_NOM[month]}_{year}{suffix}.xls")
+        if correction_number:
+            default_name = default_name.replace(".xls", f"_корр_{correction_number}.xls")
         default_name = default_name.replace(" ", "_")
         out = filedialog.asksaveasfilename(
             title="Сохранить табель как…",
@@ -316,8 +344,8 @@ class TimesheetWindow(tk.Toplevel):
         self.update_idletasks()
 
         try:
-            generate_timesheet(dept, year, month, dict(self.absences), out, period=period)
-            documents.save_file("timesheet", out, {"year": year, "month": month,
+            generate_timesheet(dept, year, month, dict(self.absences), out, period=period, correction_number=correction_number)
+            documents.save_file("timesheet", out, {"year": year, "month": month, "correction_number": correction_number,
                                                    "period": self.period_var.get()})
         except Exception as e:  # noqa: BLE001
             self.status.config(text="")
@@ -713,7 +741,7 @@ class SettingsDialog(tk.Toplevel):
         ]
         for i, (key, label) in enumerate(fields):
             ttk.Label(self, text=label).grid(row=i, column=0, sticky="w", padx=8, pady=4)
-            v = tk.StringVar(value=settings.get(key, "Начальник ОК" if key == "timesheet_hr_position" else ""))
+            v = tk.StringVar(value=settings.get(key) or {"timesheet_hr_position": "Начальник ОК", "timesheet_hr_fio": "Н.В. Кечина"}.get(key, ""))
             ttk.Entry(self, textvariable=v, width=60).grid(row=i, column=1, padx=8, pady=4)
             self.vars[key] = v
 

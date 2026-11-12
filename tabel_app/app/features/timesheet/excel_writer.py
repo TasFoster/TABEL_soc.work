@@ -4,6 +4,8 @@
 Часы стоят над кодом дня. Все дни месяца расположены горизонтально.
 """
 import os
+import math
+import re
 from copy import deepcopy
 
 import xlrd
@@ -53,6 +55,21 @@ def generate(template_path, out_path, context, keep_open=False):
             return [r + 2 * i for i in range(len(employees))]
         return [r + shift]
 
+    formatted = {}
+
+    def cell_style(r, c):
+        key = (r, c)
+        if key not in formatted:
+            style = deepcopy(styles.cell_style(sheet, r, c))
+            if r >= T_EMP_TOP or (r in (2, 3) and c == 12):
+                style.font.height = 200
+                style.font.bold = True
+            if r in (T_EMP_TOP, T_EMP_BOT) and c in (1, 3, 5):
+                style.alignment.wrap = False
+                style.alignment.shri = True
+            formatted[key] = style
+        return formatted[key]
+
     for c, info in sheet.colinfo_map.items():
         ws.col(c).width = info.width
     for r in range(T_TAIL_LAST + 1):
@@ -63,11 +80,11 @@ def generate(template_path, out_path, context, keep_open=False):
                 ws.row(target).height_mismatch = True
             for c in range(sheet.ncols):
                 if (r, c) not in covered:
-                    ws.write(target, c, sheet.cell_value(r, c), styles.cell_style(sheet, r, c))
+                    ws.write(target, c, sheet.cell_value(r, c), cell_style(r, c))
     merged_styles = {}
     for a, b, x, y in sheet.merged_cells:
         for target in destinations(a):
-            style = styles.cell_style(sheet, a, x)
+            style = cell_style(a, x)
             if a == T_EMP_TOP and b == T_EMP_BOT + 1:
                 key = sheet.cell_xf_index(a, x)
                 if key not in merged_styles:
@@ -89,7 +106,7 @@ def generate(template_path, out_path, context, keep_open=False):
         key = (src, c)
         style = write_styles.get(key)
         if style is None:
-            style = styles.cell_style(sheet, src, c)
+            style = cell_style(src, c)
             if src == T_EMP_TOP and c in (0, 1, 3, 5):
                 style = deepcopy(style)
                 style.borders.bottom = xlwt.Borders.THIN
@@ -108,6 +125,7 @@ def generate(template_path, out_path, context, keep_open=False):
     write(7, 5, context.get("department_name", ""))
     write(5, 38, context.get("report_date", ""))
     write(9, 38, context.get("formation_date", ""))
+    write(8, 5, "корректирующий" if context.get("correction_number", 0) else "первичный")
     write(8, 38, context.get("correction_number", 0))  # 0 — первичный, 1 и далее — корректирующий
     for day in range(1, 32):
         c = day_column(day)
@@ -120,7 +138,7 @@ def generate(template_path, out_path, context, keep_open=False):
         top = T_EMP_TOP + 2 * i
         bot = top + 1
         for c, value in ((0, emp["n"]), (1, emp["fio"]),
-                         (3, str(emp.get("tab_number", ""))), (5, emp.get("position", ""))):
+                         (3, str(emp.get("tab_number", ""))), (5, re.sub(r"^соц\.\s*работник$", "социальный работник", emp.get("position", "").strip(), flags=re.I))):
             write(top, c, value, T_EMP_TOP)
         write(top, 4, emp.get("oklad", ""), T_EMP_TOP)
         indicators = emp.get("indicators", {})
@@ -165,11 +183,43 @@ def generate(template_path, out_path, context, keep_open=False):
     ):
         write(r + shift, c, value, r)
 
+    # Размеры идентификационных колонок по содержимому. Длинный текст
+    # остаётся в одной строке с уменьшением до ширины ячейки.
+    def width_for(values, minimum, maximum):
+        return int(min(maximum, max(minimum, max((len(str(v)) for v in values), default=0) + 2)) * 256)
+    fio_width = width_for([e["fio"] for e in employees], 28, 55)
+    ws.col(1).width = max(ws.col(1).width, fio_width - ws.col(2).width)
+    ws.col(3).width = max(ws.col(3).width, width_for([e.get("tab_number", "") for e in employees], 12, 24))
+    ws.col(5).width = max(ws.col(5).width, width_for([e.get("position", "") for e in employees] + ["социальный работник"], 22, 38))
+    for i, employee in enumerate(employees):
+        for r in (T_EMP_TOP + 2*i, T_EMP_BOT + 2*i):
+            ws.row(r).height = max(ws.row(r).height, 300)
+            ws.row(r).height_mismatch = True
+    # Разрывы только между целыми парами. Запас по высоте учитывает
+    # повторяемую шапку и поля A4, масштаб печати никогда не увеличивает лист.
+    header_height = sum(ws.row(r).height for r in range(14))
+    budget = 10500 - header_height
+    used, breaks = 0, []
+    for i in range(len(employees)):
+        top = T_EMP_TOP + 2*i
+        height = ws.row(top).height + ws.row(top+1).height
+        if height > budget:
+            raise ExcelWriterError("Слишком много строк неявок у одного сотрудника для страницы A4.")
+        if used and used + height > budget:
+            breaks.append((top, 0, sheet.ncols-1))
+            used = 0
+        used += height
+    tail_height = sum(ws.row(r+shift).height for r in range(T_TAIL_FIRST, T_TAIL_LAST+1))
+    if used + tail_height > budget:
+        breaks.append((T_TAIL_FIRST+shift, 0, sheet.ncols-1))
+    ws.horz_page_breaks = breaks
     repeat_print_rows(wb, 0, T_HEADER_LAST)
     ws.header_str = ws.footer_str = b""
     ws.portrait = False
     ws.paper_size_code = 9  # A4, ширина — один лист, высота по числу сотрудников
-    ws.fit_num_pages = 1
+    total_width_points = sum(ws.col(c).width / 256 * 7 * 0.75 for c in range(sheet.ncols))
+    ws.print_scaling = max(10, min(100, math.floor(790 / total_width_points * 100)))
+    ws.fit_num_pages = 0
     ws.fit_width_to_pages = 1
     ws.fit_height_to_pages = 0
     ws.left_margin = ws.right_margin = 0.2

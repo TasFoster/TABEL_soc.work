@@ -157,3 +157,32 @@ class TimesheetFormTests(unittest.TestCase):
             b = xlrd.open_workbook(str(out))
             self.assertEqual(b.sheet_by_index(0).cell_value(8, 38), 2)
             b.release_resources()
+
+    def test_layout_font_and_whole_employee_page_breaks(self):
+        book, ctx = self.generate(count=30)
+        sheet = book.sheet_by_index(0)
+        for row, col in ((2, 12), (3, 12), (14, 1), (15, 6), (75, 11)):
+            font = book.font_list[book.xf_list[sheet.cell_xf_index(row, col)].font_index]
+            self.assertEqual(font.height, 200)
+            self.assertTrue(font.bold)
+        template = xlrd.open_workbook(storage.template_path(), formatting_info=True)
+        original = template.sheet_by_index(0)
+        for row, col in ((11, 0), (12, 6), (13, 5)):
+            a = book.font_list[book.xf_list[sheet.cell_xf_index(row, col)].font_index]
+            b = template.font_list[template.xf_list[original.cell_xf_index(row, col)].font_index]
+            self.assertEqual((a.height, a.bold), (b.height, b.bold))
+        template.release_resources()
+        for col in (1, 3, 5):
+            self.assertFalse(book.xf_list[sheet.cell_xf_index(14, col)].alignment.text_wrapped)
+        self.assertTrue(sheet.horizontal_page_breaks)
+        for row, first, last in sheet.horizontal_page_breaks:
+            self.assertEqual((row-14) % 2, 0)
+        ctx['employees'][0]['position'] = 'соц.работник'
+        ctx['correction_number'] = 1
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory) / 'layout.xls'
+            excel_writer.generate(storage.template_path(), str(out), ctx)
+            b = xlrd.open_workbook(str(out))
+            self.assertEqual(b.sheet_by_index(0).cell_value(14, 5), 'социальный работник')
+            self.assertEqual(b.sheet_by_index(0).cell_value(8, 5), 'корректирующий')
+            b.release_resources()

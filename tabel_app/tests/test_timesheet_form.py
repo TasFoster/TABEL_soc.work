@@ -186,3 +186,28 @@ class TimesheetFormTests(unittest.TestCase):
             self.assertEqual(b.sheet_by_index(0).cell_value(14, 5), 'социальный работник')
             self.assertEqual(b.sheet_by_index(0).cell_value(8, 5), 'корректирующий')
             b.release_resources()
+
+    def test_scaled_pagination_uses_page_without_changing_rows(self):
+        small, _ = self.generate(count=12)
+        self.assertEqual(small.sheet_by_index(0).horizontal_page_breaks, [])
+        large, _ = self.generate(count=24)
+        sheet = large.sheet_by_index(0)
+        breaks = sheet.horizontal_page_breaks
+        self.assertEqual(len(breaks), 1)
+        self.assertGreaterEqual((breaks[0][0] - 14) // 2, 12)
+        # Исправление не уплотняет сами строки и не уменьшает их шрифт.
+        self.assertEqual(sheet.rowinfo_map[14].height, small.sheet_by_index(0).rowinfo_map[14].height)
+        self.assertEqual(sheet.colinfo_map[3].width, small.sheet_by_index(0).colinfo_map[3].width)
+        for row, first, last in breaks:
+            self.assertEqual((row - 14) % 2, 0)
+        # Большое число неявок повышает строки и учитывается при разбиении.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        _, ctx = self.generate(count=24)
+        for employee in ctx['employees']:
+            employee['reasons'] = [{'code': f'К{i}', 'days': 1} for i in range(8)]
+        out = pathlib.Path(tmp.name) / 'tall.xls'
+        excel_writer.generate(storage.template_path(), str(out), ctx)
+        tall = xlrd.open_workbook(str(out), formatting_info=True)
+        self.addCleanup(tall.release_resources)
+        self.assertLess(tall.sheet_by_index(0).horizontal_page_breaks[0][0], breaks[0][0])

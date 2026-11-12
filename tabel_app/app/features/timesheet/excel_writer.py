@@ -197,8 +197,14 @@ def generate(template_path, out_path, context, keep_open=False):
             ws.row(r).height_mismatch = True
     # Разрывы только между целыми парами. Запас по высоте учитывает
     # повторяемую шапку и поля A4, масштаб печати никогда не увеличивает лист.
+    total_width_points = sum(ws.col(c).width / 256 * 7 * 0.75 for c in range(sheet.ncols))
+    scale = max(10, min(100, math.floor(790 / total_width_points * 100)))
     header_height = sum(ws.row(r).height for r in range(14))
-    budget = 10500 - header_height
+    # A4 альбомный: 210 мм по высоте, поля по 0.3 дюйма.
+    # Переводим полезную высоту обратно в единицы немасштабированного листа.
+    # Дополнительные 12 пт — запас на особенности драйвера печати.
+    printable_points = 210 / 25.4 * 72 - 2 * 0.3 * 72 - 12
+    budget = math.floor(printable_points * 20 * 100 / scale) - header_height
     used, breaks = 0, []
     for i in range(len(employees)):
         top = T_EMP_TOP + 2*i
@@ -217,8 +223,7 @@ def generate(template_path, out_path, context, keep_open=False):
     ws.header_str = ws.footer_str = b""
     ws.portrait = False
     ws.paper_size_code = 9  # A4, ширина — один лист, высота по числу сотрудников
-    total_width_points = sum(ws.col(c).width / 256 * 7 * 0.75 for c in range(sheet.ncols))
-    ws.print_scaling = max(10, min(100, math.floor(790 / total_width_points * 100)))
+    ws.print_scaling = scale
     ws.fit_num_pages = 0
     ws.fit_width_to_pages = 1
     ws.fit_height_to_pages = 0

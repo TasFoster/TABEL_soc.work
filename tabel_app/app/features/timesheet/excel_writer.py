@@ -108,7 +108,7 @@ def generate(template_path, out_path, context, keep_open=False):
     write(7, 5, context.get("department_name", ""))
     write(5, 38, context.get("report_date", ""))
     write(9, 38, context.get("formation_date", ""))
-    write(8, 38, 0)  # первичный табель
+    write(8, 38, context.get("correction_number", 0))  # 0 — первичный, 1 и далее — корректирующий
     for day in range(1, 32):
         c = day_column(day)
         write(12, c, str(day) if day <= context.get("ndays", 31) else "")
@@ -132,7 +132,7 @@ def generate(template_path, out_path, context, keep_open=False):
         for col, items in ((47, reasons[:1]), (48, reasons[1:])):
             if not items:
                 continue
-            write(top, col, "\n".join(r["code"] for r in items), T_EMP_TOP)
+            write(top, col, "\n".join("О" if r["code"] == "ОТ" else r["code"] for r in items), T_EMP_TOP)
             write(bot, col, "\n".join(str(r["days"]) for r in items), T_EMP_BOT)
             if len(items) > 1:
                 for row in (top, bot):
@@ -147,7 +147,7 @@ def generate(template_path, out_path, context, keep_open=False):
             c = day_column(day)
             worked = isinstance(mark, (int, float))
             write(top, c, mark if worked else "", T_EMP_TOP)
-            write(bot, c, "Я" if worked else str(mark), T_EMP_BOT)
+            write(bot, c, "Я" if worked else ("О" if mark == "ОТ" else str(mark)), T_EMP_BOT)
             if day <= 15 and worked:
                 half.append(mark)
         write(top, C_HALF, len(half), T_EMP_TOP)

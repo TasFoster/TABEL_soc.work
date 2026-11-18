@@ -5,7 +5,8 @@ import zipfile
 from pathlib import Path
 from . import rtf
 TYPES = {'additional':'Договоры на дополнительные услуги', 'free':'Договоры на бесплатные услуги',
-         'paid':'Договоры на государственные услуги — платные'}
+         'paid':'Договоры на государственные услуги — платные',
+         'additional_act':'Акты на дополнительные услуги'}
 
 
 def validate_rules(rules):
@@ -28,8 +29,11 @@ def transform(raw, kind, rules):
     text, _ = rtf.parse(raw)
     if kind not in TYPES:
         raise ValueError('Неизвестный тип договора.')
+    act = bool(locate(text, 'Акт сдачи-приемки оказанных дополнительных услуг'))
+    if act != (kind == 'additional_act'):
+        raise ValueError('Тип документа не соответствует выбранному: акт или договор.')
     additional = 'Договор о предоставлении дополнительных социальных услуг' in text
-    if additional != (kind == 'additional'):
+    if not act and additional != (kind == 'additional'):
         raise ValueError('Тип договора не соответствует выбранному.')
     if kind in ('free','paid'):
         match = re.search(r'Стоимость\s+Услуг,\s+предусмотренных\s+настоящим\s+Договором,\s+составляет\s+([\d ,\.]+)', text)

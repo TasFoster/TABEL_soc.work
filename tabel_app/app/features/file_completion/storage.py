@@ -4,10 +4,14 @@ from ...core import storage
 PACKAGE = str(Path(__file__).parent)
 
 def load_rules():
+    default_path = Path(storage.feature_resource_dir('file_completion', PACKAGE)) / 'data/rules.json'
+    defaults = json.loads(default_path.read_text(encoding='utf-8'))
     path = Path(storage.feature_data_dir('file_completion')) / 'rules.json'
-    if not path.exists():
-        path = Path(storage.feature_resource_dir('file_completion', PACKAGE)) / 'data/rules.json'
-    return json.loads(path.read_text(encoding='utf-8'))
+    if path.exists():
+        # Новые типы доступны после обновления, прежние пользовательские правки сохраняются.
+        defaults.update(json.loads(path.read_text(encoding='utf-8')))
+    return defaults
+
 
 def save_rules(rules):
     from .service import validate_rules

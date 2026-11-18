@@ -10,6 +10,7 @@ RULES=json.loads((Path(__file__).resolve().parents[1]/'app/features/file_complet
 
 def document(kind):
     title='Договор о предоставлении дополнительных социальных услуг' if kind=='additional' else 'Договор о предоставлении социальных услуг'
+    if kind=='additional_act':title='Акт сдачи-приемки оказанных дополнительных услуг'
     amount='0,00' if kind=='free' else '120,00'
     text=title+'\nСтоимость Услуг, предусмотренных настоящим Договором, составляет '+amount+' рублей в месяц.\nКлиент Тестов, паспорт 1234, номер 42\n'
     for rule in RULES[kind]:text+=(rule['before']+'\n')*rule['count']
@@ -74,3 +75,17 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(result.count(b'\\pard'),1)
         self.assertIn(b'\\ls1\\ilvl0\\fi567',result)
         self.assertNotIn('Инструкция',rtf.parse(result)[0])
+
+    def test_new_type_merges_with_existing_custom_rules(self):
+        from unittest.mock import patch
+        from app.features.file_completion import storage
+        with tempfile.TemporaryDirectory() as directory, patch('app.core.storage.app_base_dir',return_value=directory):
+            folder=Path(directory)/'data/file_completion';folder.mkdir(parents=True)
+            previous={k:v for k,v in RULES.items() if k!='additional_act'}
+            previous['free']=[dict(r) for r in previous['free']]
+            previous['free'][0]['after']='Заказчик получает услуги без оплаты.'
+            (folder/'rules.json').write_text(json.dumps(previous),encoding='utf-8')
+            loaded=storage.load_rules()
+            self.assertIn('additional_act',loaded)
+            self.assertEqual(loaded['free'][0]['after'],'Заказчик получает услуги без оплаты.')
+            service.validate_rules(loaded)

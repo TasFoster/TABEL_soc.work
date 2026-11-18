@@ -6,11 +6,15 @@ from pathlib import Path
 from . import rtf
 TYPES = {'additional':'Договоры на дополнительные услуги', 'free':'Договоры на бесплатные услуги',
          'paid':'Договоры на государственные услуги — платные',
-         'additional_act':'Акты на дополнительные услуги'}
+         'additional_act':'Акты на государственные и дополнительные услуги'}
 
 
 def validate_rules(rules):
     for key in TYPES:
+        for rule in rules[key]:
+            if not isinstance(rule.get('before_variants', []), list) or any(
+                not isinstance(v,str) or not v.strip() for v in rule.get('before_variants', [])):
+                raise ValueError('before_variants должен содержать непустые строки.')
         rows = rules[key]
         if not rows or any(not isinstance(r.get('before'), str) or not r['before'].strip() or
                            not isinstance(r.get('after'), str) or not r['after'].strip() or
@@ -24,12 +28,22 @@ def locate(text, fragment):
     return list(re.finditer(pattern, text))
 
 
+def locate_before(text, rule):
+    fragments = [rule['before']] + rule.get('before_variants', [])
+    found = {(m.start(),m.end()):m for fragment in fragments for m in locate(text,fragment)}
+    return [found[key] for key in sorted(found)]
+
+
 def transform(raw, kind, rules):
     validate_rules(rules)
     text, _ = rtf.parse(raw)
     if kind not in TYPES:
         raise ValueError('Неизвестный тип договора.')
-    act = bool(locate(text, 'Акт сдачи-приемки оказанных дополнительных услуг'))
+    # Тип определяется заголовком внутри документа, а не именем файла.
+    act = bool(re.search(r'Акт\s+сдачи[-–‑]при[её]мки\s+оказанных\s+'
+                         r'(?:(?:государственных|дополнительных)\s+)?социальных\s+услуг'
+                         r'|Акт\s+сдачи[-–‑]при[её]мки\s+оказанных\s+'
+                         r'(?:государственных|дополнительных)\s+услуг', text, re.I))
     if act != (kind == 'additional_act'):
         raise ValueError('Тип документа не соответствует выбранному: акт или договор.')
     additional = 'Договор о предоставлении дополнительных социальных услуг' in text
@@ -44,7 +58,7 @@ def transform(raw, kind, rules):
             raise ValueError('Сумма договора не соответствует выбранному типу.')
     states = []
     for rule in rules[kind]:
-        before, after = locate(text,rule['before']), locate(text,rule['after'])
+        before, after = locate_before(text,rule), locate(text,rule['after'])
         # after может содержать before (добавление предложения).
         covered = [b for b in before if not any(a.start()<=b.start() and b.end()<=a.end() for a in after)]
         if len(after)==rule['count'] and not covered:
@@ -60,7 +74,7 @@ def transform(raw, kind, rules):
     result = raw
     for rule in rules[kind]:
         current, _ = rtf.parse(result)
-        for m in reversed(locate(current,rule['before'])):
+        for m in reversed(locate_before(current,rule)):
             result = rtf.replace(result,m.start(),m.end(),rule['after'])
     final, _ = rtf.parse(result)
     for rule in rules[kind]:

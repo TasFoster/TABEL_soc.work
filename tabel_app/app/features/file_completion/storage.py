@@ -9,7 +9,14 @@ def load_rules():
     path = Path(storage.feature_data_dir('file_completion')) / 'rules.json'
     if path.exists():
         # Новые типы доступны после обновления, прежние пользовательские правки сохраняются.
-        defaults.update(json.loads(path.read_text(encoding='utf-8')))
+        custom = json.loads(path.read_text(encoding='utf-8'))
+        # Добавляем новые исходные варианты к прежнему стандартному правилу акта,
+        # сохраняя отредактированное пользователем целевое ФИО.
+        if custom.get('additional_act') and defaults.get('additional_act'):
+            rule = custom['additional_act'][0]
+            if rule.get('before') == defaults['additional_act'][0]['before']:
+                rule.setdefault('before_variants', defaults['additional_act'][0].get('before_variants', []))
+        defaults.update(custom)
     return defaults
 
 

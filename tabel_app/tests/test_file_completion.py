@@ -89,3 +89,25 @@ class CompletionTests(unittest.TestCase):
             self.assertIn('additional_act',loaded)
             self.assertEqual(loaded['free'][0]['after'],'Заказчик получает услуги без оплаты.')
             service.validate_rules(loaded)
+
+    def test_unified_act_headings_keep_original_text(self):
+        for heading in ('Акт сдачи-приемки оказанных дополнительных услуг',
+                        'Акт сдачи-приемки оказанных социальных услуг',
+                        'Акт сдачи-приемки оказанных государственных услуг',
+                        'Акт сдачи-приёмки оказанных государственных социальных услуг'):
+            text=heading+'\nЗаказчик Тестовый\n'+RULES['additional_act'][0]['before']
+            raw=('{\\rtf1\\ansi\\uc1 '+rtf.escape(text)+'}').encode('ascii')
+            result,status,diff=service.transform(raw,'additional_act',RULES)
+            self.assertIn(heading,rtf.parse(result)[0])
+            self.assertIn('Заказчик Тестовый',rtf.parse(result)[0])
+            self.assertIn('Директор филиала',rtf.parse(result)[0])
+            self.assertEqual(service.transform(result,'additional_act',RULES)[0],result)
+            with self.assertRaises(ValueError):service.transform(raw,'free',RULES)
+
+    def test_government_act_blank_signature_variant(self):
+        text='Акт сдачи-приемки оказанных социальных услуг\nДиректор филиала _________________________ (_______________)\nПолучатель Тестовый'
+        raw=('{\\rtf1\\ansi\\uc1 '+rtf.escape(text)+'}').encode('ascii')
+        result,_,diff=service.transform(raw,'additional_act',RULES)
+        self.assertIn('(Колесниченко Е.И.)',rtf.parse(result)[0])
+        self.assertIn('Получатель Тестовый',rtf.parse(result)[0])
+        self.assertEqual(service.transform(result,'additional_act',RULES)[2],'')

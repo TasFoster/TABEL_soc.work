@@ -10,14 +10,15 @@ from . import FEATURE_TITLE, storage
 from ...core import documents, feedback, ui_state
 from .calendar_ru import MONTHS_NOM, month_title
 from .service import generate_timesheet
-from .timesheet import days_in_month, validate_absences
+from .timesheet import days_in_month, validate_absences, display_code
 from .indicators import FIELDS, parse_indicators
 
 CODE_LABELS = {
     "ОТ": "О — отпуск",
     "Б": "Б — больничный",
     "О": "О — отпуск",
-    "ОЖ": "ОЖ — отпуск по уходу за ребёнком",
+    "ОЖ": "Р — отпуск по уходу за ребёнком",
+    "Р": "Р — отпуск по уходу за ребёнком",
 }
 
 
@@ -25,10 +26,10 @@ def _absence_codes(settings):
     codes = []
     for c in settings.get("absence_codes", []):
         if c.get("counts_as_absence"):
-            code = "О" if c["code"] == "ОТ" else c["code"]
+            code = display_code(c["code"])
             if code not in codes:
                 codes.append(code)
-    return codes or ["Б", "О", "ОЖ"]
+    return codes or ["Б", "О", "Р"]
 
 
 class TimesheetWindow(tk.Toplevel):
@@ -120,7 +121,7 @@ class TimesheetWindow(tk.Toplevel):
         self.tree.heading("n", text="№")
         self.tree.heading("fio", text="Фамилия, имя, отчество")
         self.tree.heading("position", text="Должность")
-        self.tree.heading("absence", text="Отсутствия (Б/О/ОЖ)")
+        self.tree.heading("absence", text="Отсутствия (Б/О/Р)")
         self.tree.column("n", width=40, anchor="center")
         self.tree.column("fio", width=320)
         self.tree.column("position", width=160)
@@ -213,7 +214,7 @@ class TimesheetWindow(tk.Toplevel):
 
     def _absence_text(self, n):
         items = self.absences.get(n, [])
-        return "; ".join(f"{'О' if a['code'] == 'ОТ' else a['code']}: {a['start']}–{a['end']}" for a in items)
+        return "; ".join(f"{display_code(a['code'])}: {a['start']}–{a['end']}" for a in items)
 
     def _selected_emp(self):
         sel = self.tree.selection()

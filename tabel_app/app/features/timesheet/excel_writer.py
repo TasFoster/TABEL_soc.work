@@ -10,6 +10,7 @@ from copy import deepcopy
 
 import xlrd
 import xlwt
+from .timesheet import display_code
 
 from ...core.xls_util import ColourPalette, TemplateStyles, repeat_print_rows, solid_fill
 
@@ -150,7 +151,7 @@ def generate(template_path, out_path, context, keep_open=False):
         for col, items in ((47, reasons[:1]), (48, reasons[1:])):
             if not items:
                 continue
-            write(top, col, "\n".join("О" if r["code"] == "ОТ" else r["code"] for r in items), T_EMP_TOP)
+            write(top, col, "\n".join(display_code(r["code"]) for r in items), T_EMP_TOP)
             write(bot, col, "\n".join(str(r["days"]) for r in items), T_EMP_BOT)
             if len(items) > 1:
                 for row in (top, bot):
@@ -165,7 +166,7 @@ def generate(template_path, out_path, context, keep_open=False):
             c = day_column(day)
             worked = isinstance(mark, (int, float))
             write(top, c, mark if worked else "", T_EMP_TOP)
-            write(bot, c, "Я" if worked else ("О" if mark == "ОТ" else str(mark)), T_EMP_BOT)
+            write(bot, c, "Я" if worked else display_code(str(mark)), T_EMP_BOT)
             if day <= 15 and worked:
                 half.append(mark)
         write(top, C_HALF, len(half), T_EMP_TOP)

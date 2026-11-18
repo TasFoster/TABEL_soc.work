@@ -121,7 +121,7 @@ class TimesheetFormTests(unittest.TestCase):
         self.assertEqual([s.cell_value(r, 45) for r in (14, 15)], [1, 4])
         self.assertEqual([s.cell_value(r, 46) for r in (14, 15)], [2, 6.5])
         self.assertEqual([s.cell_value(r, 47) for r in (14, 15)], ['Б', '2'])
-        self.assertEqual([s.cell_value(r, 48) for r in (14, 15)], ['О\nОЖ', '3\n4'])
+        self.assertEqual([s.cell_value(r, 48) for r in (14, 15)], ['О\nР', '3\n4'])
 
     def test_indicator_validation(self):
         from app.features.timesheet.indicators import parse_indicators

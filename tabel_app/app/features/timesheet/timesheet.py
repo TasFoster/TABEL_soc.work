@@ -94,3 +94,8 @@ def validate_absences(absences, ndays):
         if s < 1 or e > ndays or s > e:
             errors.append(f"Период {i} ({code}): неверный диапазон {s}–{e} (в месяце {ndays} дн.).")
     return errors
+
+
+def display_code(code):
+    """Печатные обозначения, совместимые с историческими сохранениями."""
+    return {"ОТ": "О", "ОЖ": "Р"}.get(code, code)

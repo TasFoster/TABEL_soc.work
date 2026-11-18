@@ -5,6 +5,8 @@
 (№, ФИО, услуги, Итого, Период), строки получателей, строка итогов, подписи.
 """
 
+import textwrap
+
 from odf.opendocument import OpenDocumentSpreadsheet
 from odf.style import (ParagraphProperties, Style, TableCellProperties,
                        TableColumnProperties, TableProperties, TableRowProperties,
@@ -132,7 +134,15 @@ def _sheet(doc, st, name, title, ctx, services, clients, total_mode):
         + _covered(ncols - 1))
 
     # шапка
-    hdr = TableRow(stylename=st["rHdr"])
+    # Минимальная высота по самому длинному названию, без ограничения сверху.
+    # Ширина услуги 1.7 см, шрифт 9 пт: около 10 символов в строке.
+    lines = max((sum(max(1, len(textwrap.wrap(line, width=10)))
+                     for line in str(title).split("\n")) for title in services), default=1)
+    header_style = Style(name="HeaderHeight_" + name, family="table-row")
+    header_style.addElement(TableRowProperties(minrowheight=f"{max(2.0, lines * 0.39 + 0.3):.2f}cm",
+                                               useoptimalrowheight="true"))
+    doc.automaticstyles.addElement(header_style)
+    hdr = TableRow(stylename=header_style)
     for v in ["№п/п", "ФИО гражданина"] + list(services) + ["Итого", "Период"]:
         hdr.addElement(_txt_cell(v, "Hdr"))
     table.addElement(hdr)
@@ -144,9 +154,9 @@ def _sheet(doc, st, name, title, ctx, services, clients, total_mode):
     idx = 0
     for cl in clients:
         svc_vals = [float(cl.counts.get(s, 0) or 0) for s in services]
+        if not any(v > 0 for v in svc_vals):
+            continue  # Каждый лист содержит только получателей его категории услуг.
         if total_mode == "sum":
-            if sum(svc_vals) <= 0:
-                continue                    # доп.лист — только клиенты с услугами
             itogo = sum(svc_vals)
         else:
             itogo = float(cl.total or 0)

@@ -68,6 +68,7 @@ $common = @(
   '--add-data', "$pl/data/plany_templates.json;features/plany/data",
   '--add-data', "$pt/data/plan.json;features/protokol/data",
   '--add-data', "$pt/data/methodical_plans.json;features/protokol/data",
+  '--add-data', 'app/features/file_completion/data/rules.json;features/file_completion/data',
   '--hidden-import', 'xlrd', '--hidden-import', 'sqlite3',
   '--collect-submodules', 'xlwt', '--collect-submodules', 'odf',
   '--collect-submodules', 'openpyxl',

@@ -94,12 +94,18 @@ def _add_protokol(features):
     features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_protokol))
 
 
+def _add_file_completion(features):
+    from .file_completion import FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION
+    from .file_completion.gui import open_file_completion
+    features.append(Feature(FEATURE_KEY, FEATURE_TITLE, FEATURE_DESCRIPTION, open_file_completion))
+
+
 # Порядок отображения в главном меню. Добавляйте сюда новые функции-регистраторы.
 # Старый «Реестр» убран из меню (общие модули пакета reestr
 # и редактор клиентов ClientsManager остаются) — его заменил «Реестр по оплате».
 _REGISTRARS = (_add_timesheet, _add_prilozhenie, _add_reestr_oplata, _add_proezd,
                _add_uslugi_dengi, _add_grafiki, _add_gos_zadanie,
-               _add_proverka_kachestva, _add_peresmotr, _add_plany, _add_protokol)
+               _add_proverka_kachestva, _add_peresmotr, _add_plany, _add_protokol, _add_file_completion)
 
 
 def get_features():

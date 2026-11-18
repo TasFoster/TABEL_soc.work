@@ -348,9 +348,9 @@ def _selftest_release():
         from app.features.registry import get_features
         variant, expected_version = sys.argv[-2:]
         features = get_features()
-        expected = 11 if variant == "full" else 10
+        expected = 12 if variant == "full" else 11
         keys = [feature.key for feature in features]
-        if (len(features) != expected or "protokol" not in keys
+        if (len(features) != expected or "protokol" not in keys or "file_completion" not in keys
                 or (("proezd" in keys) != (variant == "full"))):
             raise RuntimeError(f"Unexpected features: {keys}")
         if version.APP_VERSION != expected_version or updater.variant_key() != variant:
@@ -380,6 +380,15 @@ def _selftest_release():
             from odf.opendocument import load
             from odf.teletype import extractText
             from odf.text import P
+            from app.features.file_completion import storage as completion_storage, service as completion_service, rtf
+            rules = completion_storage.load_rules()
+            completion_service.validate_rules(rules)
+            rule = rules['additional'][0]
+            sample = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(
+                'Договор о предоставлении дополнительных социальных услуг\n' + rule['before']) + '}').encode('ascii')
+            completed, _, difference = completion_service.transform(sample, 'additional', rules)
+            if not difference or completion_service.transform(completed, 'additional', rules)[2]:
+                raise RuntimeError('File completion smoke test failed')
             from app.features.protokol import service as protocol
             from app.features.timesheet.calendar_ru import ProductionCalendar
             dept = {"number": "9", "employees": []}

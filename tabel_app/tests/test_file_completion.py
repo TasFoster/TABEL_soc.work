@@ -61,3 +61,16 @@ class CompletionTests(unittest.TestCase):
             with zipfile.ZipFile(target) as z:
                 self.assertTrue(all('/' not in n and '..' not in n for n in z.namelist()))
             with self.assertRaises(ValueError):service.save_results(rows,target,True)
+
+    def test_multiline_payment_keeps_original_list_number(self):
+        before = 'Оплата ____\nИнструкция ____'
+        raw = ('{\\rtf1\\ansi\\uc1 {\\listtext 11.\\tab}\\pard\\ls1\\ilvl0\\fi567 '
+               + rtf.escape('Оплата ____') + '\\par \\pard\\li0 '
+               + rtf.escape('Инструкция ____') + '\\par }').encode('ascii')
+        text, _ = rtf.parse(raw)
+        match = service.locate(text,before)[0]
+        result = rtf.replace(raw,match.start(),match.end(),'Услуги бесплатно.')
+        self.assertIn('11.',rtf.parse(result)[0])
+        self.assertEqual(result.count(b'\\pard'),1)
+        self.assertIn(b'\\ls1\\ilvl0\\fi567',result)
+        self.assertNotIn('Инструкция',rtf.parse(result)[0])

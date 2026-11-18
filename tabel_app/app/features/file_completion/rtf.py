@@ -65,8 +65,21 @@ def escape(text):
 
 
 def replace(raw, start, end, replacement):
-    _, spans = parse(raw)
+    text, spans = parse(raw)
     tokens = sorted(set(spans[start:end]))
+    if '\n' in text[start:end] and '\n' not in replacement:
+        # При схлопывании нескольких абзацев их поздние \pard сбрасывают
+        # нумерацию первого абзаца, хотя видимый listtext «11.» остаётся.
+        # Убираем настройки удаляемых абзацев вместе с их текстом.
+        paragraph_words = {'pard', 's', 'ls', 'ilvl', 'fi', 'li', 'ri', 'lin', 'rin',
+                           'sb', 'sa', 'sl', 'slmult', 'ql', 'qr', 'qj', 'qc',
+                           'tx', 'keep', 'keepn', 'widctlpar', 'nowidctlpar',
+                           'outlinelevel', 'contextualspace'}
+        lower, upper = tokens[0][0], tokens[-1][1]
+        for match in TOKEN.finditer(raw.decode('latin1'), lower, upper):
+            if match.group(2) in paragraph_words:
+                tokens.append((match.start(), match.end()))
+        tokens = sorted(set(tokens))
     if not tokens:
         raise ValueError('Пустая область замены.')
     # Удаляются только текстовые токены, управляющие группы и стили остаются.

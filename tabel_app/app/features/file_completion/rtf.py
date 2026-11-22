@@ -6,8 +6,8 @@ SKIP = {'fonttbl','colortbl','stylesheet','info','pict','object','header','foote
 
 
 def parse(raw):
-    if not raw.startswith(b'{\\rtf') or len(raw) > 10_000_000:
-        raise ValueError('Ожидается RTF до 10 МБ.')
+    if not raw.startswith(b'{\\rtf') or len(raw) > 32_000_000:
+        raise ValueError('Ожидается RTF до 32 МБ.')
     source = raw.decode('latin1')
     out, spans, stack = [], [], []
     skip, uc, fallback = False, 1, 0

@@ -94,19 +94,19 @@ def read_inputs(paths):
             if path.suffix.lower()=='.zip':
                 with zipfile.ZipFile(path) as archive:
                     entries = [e for e in archive.infolist() if not e.is_dir()]
-                    if len(entries)>500 or sum(e.file_size for e in entries)>100_000_000:
-                        raise ValueError('ZIP превышает 500 файлов или 100 МБ.')
+                    if len(entries)>2000 or sum(e.file_size for e in entries)>512_000_000:
+                        raise ValueError('ZIP превышает 2000 файлов или 512 МБ.')
                     for entry in entries:
                         name = entry.filename
                         try:
-                            if Path(name).suffix.lower()!='.rtf' or entry.file_size>10_000_000:
-                                raise ValueError('Поддерживается только RTF до 10 МБ.')
+                            if Path(name).suffix.lower()!='.rtf' or entry.file_size>32_000_000:
+                                raise ValueError('Поддерживается только RTF до 32 МБ.')
                             rows.append({'name':path.name+' / '+name,'raw':archive.read(entry)})
                         except Exception as exc:
                             rows.append({'name':name,'error':str(exc)})
             else:
-                if path.suffix.lower()!='.rtf' or path.stat().st_size>10_000_000:
-                    raise ValueError('Поддерживается только RTF до 10 МБ.')
+                if path.suffix.lower()!='.rtf' or path.stat().st_size>32_000_000:
+                    raise ValueError('Поддерживается только RTF до 32 МБ.')
                 rows.append({'name':path.name,'raw':path.read_bytes()})
         except Exception as exc:
             rows.append({'name':str(path),'error':str(exc)})

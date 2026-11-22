@@ -82,7 +82,7 @@ def prepare(source, folder, month, signed, worker, director):
     from docx.text.paragraph import Paragraph
     with tempfile.TemporaryDirectory() as tmp:
         temp = Path(tmp)
-        path = convert(source, temp, "docx") if source.suffix.lower() == ".doc" else source
+        path = convert(source, temp, "docx") if source.suffix.lower() in (".doc", ".rtf") else source
         doc = Document(path)
         paragraphs = [Paragraph(node, doc) for node in doc.element.body.xpath(".//w:p")]
         text = "\n".join(p.text for p in paragraphs)

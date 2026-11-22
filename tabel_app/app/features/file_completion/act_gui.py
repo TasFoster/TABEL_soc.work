@@ -34,7 +34,7 @@ def open_editor(parent):
         worker, director = [v.get().strip() for v in fields[1:]]
         if not director:
             return messagebox.showerror("Директор", "Укажите ФИО директора.", parent=window)
-        paths = filedialog.askopenfilenames(parent=window, filetypes=[("Акты Word", "*.doc *.docx")])
+        paths = filedialog.askopenfilenames(parent=window, filetypes=[("Акты (RTF, DOC, DOCX)", "*.rtf *.doc *.docx")])
         folder = filedialog.askdirectory(parent=window) if paths else None
         if not folder:
             return

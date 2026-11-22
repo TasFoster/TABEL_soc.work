@@ -3,6 +3,7 @@ import difflib
 import re
 import zipfile
 from pathlib import Path
+from .names import recipient
 from . import rtf
 TYPES = {'additional':'Договоры на дополнительные услуги', 'free':'Договоры на бесплатные услуги',
          'paid':'Договоры на государственные услуги — платные',
@@ -121,7 +122,16 @@ def save_results(rows, destination, zipped=False):
         if row.get('result') is not None and row.get('changed'):
             # Плоские уникальные имена, без извлечения путей из ZIP.
             stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', Path(row['name'].split(' / ')[-1]).stem).rstrip('. ')[:120] or 'договор'
-            outputs[f'{i:03d}_{stem}_готовый.rtf'] = row['result']
+            text, _ = rtf.parse(row['result'])
+            client = recipient(text)
+            kind = 'акт' if re.search(r'^Акт сдачи', text, re.M | re.I) else 'договор'
+            base = f'{client}_{kind}' if client else f'{i:03d}_{stem}_готовый'
+            name = base + '.rtf'
+            serial = 2
+            while name in outputs:
+                name = f'{base}_{serial}.rtf'
+                serial += 1
+            outputs[name] = row['result']
     if not outputs:
         raise ValueError('Нет новых результатов для сохранения.')
     if zipped:

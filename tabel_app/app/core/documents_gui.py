@@ -67,7 +67,8 @@ class DocumentsWindow(tk.Toplevel):
 
     # ---------------------------------------------------------------- данные
     def _reload(self):
-        self._all = documents.list_documents()
+        self._all = [(doc, documents.params_brief(doc.get("params")))
+                     for doc in documents.list_documents()]
         self._apply()
 
     def _feature_key_by_title(self, title):
@@ -80,12 +81,11 @@ class DocumentsWindow(tk.Toplevel):
         text = self.search_var.get().strip().lower()
         feat_filter = self._feature_key_by_title(self.feature_var.get())
         rows = []
-        for d in self._all:
+        for d, period in self._all:
             if feat_filter and d.get("feature") != feat_filter:
                 continue
             feat_title = FEATURE_TITLES.get(d["feature"], d["feature"])
             title = d.get("title") or d.get("filename") or ""
-            period = documents.params_brief(d.get("params"))
             if text and text not in (title.lower() + " " + feat_title.lower() + " " + period.lower()):
                 continue
             rows.append((d, feat_title, title, period))

@@ -13,6 +13,8 @@ from . import db
 
 FEATURE_TITLES = {
     "timesheet": "Табель",
+    "plany": "Планы",
+    "reestr_oplata": "Реестр по оплате",
     "reestr": "Реестр",
     "prilozhenie": "Приложение к табелю",
     "proezd": "Проезд",

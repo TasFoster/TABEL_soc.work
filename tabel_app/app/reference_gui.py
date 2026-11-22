@@ -10,6 +10,9 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 
+from .core import feedback
+
+
 class ReferenceWindow(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
@@ -32,6 +35,7 @@ class ReferenceWindow(tk.Toplevel):
         ]
         for text, cmd in items:
             ttk.Button(self, text=text, command=cmd).pack(fill="x", padx=12, pady=4)
+        feedback.add_button(self, self, self.title(), pady=4)
         ttk.Button(self, text="Закрыть", command=self.destroy).pack(pady=(10, 0))
 
     def _run(self, factory):

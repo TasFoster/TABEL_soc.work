@@ -22,7 +22,7 @@ from tkinter import messagebox, ttk
 from .version import APP_VERSION_DISPLAY, app_variant
 
 FEEDBACK_EMAIL = "farcrystas@gmail.com"
-CATEGORIES = ("Проблема", "Пожелание", "Вопрос")
+CATEGORIES = ("Проблема", "Пожелание", "Доработка", "Вопрос")
 
 # Прямая отправка письма из приложения через Web3Forms (без своего сервера, без
 # паролей в .exe). Вставьте Access Key с web3forms.com (привязан к FEEDBACK_EMAIL) —

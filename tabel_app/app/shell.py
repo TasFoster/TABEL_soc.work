@@ -12,7 +12,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from .core import ui_state, updater_gui
+from .core import feedback, ui_state, updater_gui
 from .core.version import APP_VERSION
 from .core.clipboard import enable_hotkeys
 from .core.documents_gui import open_documents
@@ -40,6 +40,9 @@ class Shell(ctk.CTk):
         header.pack(fill="x", padx=16, pady=(14, 2))
         ctk.CTkLabel(header, text="Выберите функцию",
                      font=ctk.CTkFont(size=18, weight="bold")).pack(side="left")
+
+        ctk.CTkButton(header, text="Отзывы, жалобы и пожелания",
+                      command=lambda: feedback.open_feedback_dialog(self)).pack(side="right")
 
         toolbar = ctk.CTkFrame(self, fg_color="transparent")
         toolbar.pack(fill="x", padx=14, pady=(0, 6))

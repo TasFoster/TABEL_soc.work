@@ -7,7 +7,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import documents
+from . import documents, feedback
 from .documents import FEATURE_TITLES
 
 _ALL = "Все функции"
@@ -62,6 +62,7 @@ class DocumentsWindow(tk.Toplevel):
         ttk.Button(bar, text="Открыть", command=self._open).pack(side="left")
         ttk.Button(bar, text="Сохранить как…", command=self._save_as).pack(side="left", padx=6)
         ttk.Button(bar, text="Удалить", command=self._delete).pack(side="left")
+        feedback.add_button(bar, self, self.title(), side="left", padx=6)
         ttk.Button(bar, text="Обновить", command=self._reload).pack(side="right")
 
     # ---------------------------------------------------------------- данные

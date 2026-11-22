@@ -12,6 +12,8 @@ import datetime
 import getpass
 import json
 import os
+import queue
+import threading
 import sys
 import tkinter as tk
 import urllib.parse
@@ -46,7 +48,7 @@ def _post_web3forms(subject, body):
                  # без браузерного User-Agent Web3Forms отвечает 403 (server-side блок)
                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
     with urllib.request.urlopen(req, timeout=15) as resp:
-        return 200 <= resp.status < 300
+        return 200 <= resp.status < 300 and json.load(resp).get("success") is True
 
 
 def _system_info(feature_title):
@@ -103,8 +105,11 @@ class FeedbackDialog(tk.Toplevel):
         cf.pack(fill="x", **pad)
         ttk.Label(cf, text="Тип:").pack(side="left")
         self.cat_var = tk.StringVar(value=CATEGORIES[0])
+        self.categories = []
         for c in CATEGORIES:
-            ttk.Radiobutton(cf, text=c, value=c, variable=self.cat_var).pack(side="left", padx=(6, 0))
+            option = ttk.Radiobutton(cf, text=c, value=c, variable=self.cat_var)
+            option.pack(side="left", padx=(6, 0))
+            self.categories.append(option)
         ttk.Label(self, text="Опишите подробно:").pack(anchor="w", padx=10)
         self.text = tk.Text(self, height=12, wrap="word")
         self.text.pack(fill="both", expand=True, padx=10)
@@ -114,7 +119,8 @@ class FeedbackDialog(tk.Toplevel):
                   foreground="#888").pack(fill="x", padx=10, pady=(4, 0))
         bar = ttk.Frame(self)
         bar.pack(fill="x", **pad)
-        ttk.Button(bar, text="Отправить", command=self._send).pack(side="right")
+        self.send_button = ttk.Button(bar, text="Отправить", command=self._send)
+        self.send_button.pack(side="right")
         ttk.Button(bar, text="Скопировать", command=self._copy).pack(side="right", padx=6)
         ttk.Button(bar, text="Закрыть", command=self.destroy).pack(side="left")
 
@@ -133,22 +139,43 @@ class FeedbackDialog(tk.Toplevel):
         if not self.text.get("1.0", "end").strip():
             messagebox.showinfo("Пусто", "Сначала напишите текст обращения.")
             return
-        # Прямая отправка по интернету, если задан ключ Web3Forms.
-        if WEB3FORMS_KEY:
+        if not WEB3FORMS_KEY:
+            self._open_mailto()
+            return
+
+        subject, body = self._subject(), self._body()
+        outcome = queue.SimpleQueue()
+        self.send_button.configure(state="disabled", text="Отправка…")
+        self.text.configure(state="disabled")
+        for option in self.categories:
+            option.state(["disabled"])
+
+        def submit():
             try:
-                if _post_web3forms(self._subject(), self._body()):
-                    messagebox.showinfo(
-                        "Отправлено", "Спасибо! Ваше сообщение отправлено разработчику.")
-                    self.destroy()
-                    return
-            except Exception:  # noqa: BLE001 — нет сети/ошибка сервиса → запасной путь
-                pass
-            if not messagebox.askyesno(
-                "Не удалось отправить",
-                "Не получилось отправить через интернет (возможно, нет сети).\n"
-                "Открыть письмо в почтовой программе вместо этого?"):
+                outcome.put(_post_web3forms(subject, body))
+            except Exception:
+                outcome.put(False)
+
+        def check_result():
+            try:
+                success = outcome.get_nowait()
+            except queue.Empty:
+                self.after(100, check_result)
                 return
-        self._open_mailto()
+            if success:
+                messagebox.showinfo("Отправлено", "Спасибо! Обращение отправлено.", parent=self)
+                self.destroy()
+                return
+            self.send_button.configure(state="normal", text="Отправить")
+            self.text.configure(state="normal")
+            for option in self.categories:
+                option.state(["!disabled"])
+            if messagebox.askyesno("Не удалось подтвердить отправку",
+                                   "Открыть письмо в почтовой программе?", parent=self):
+                self._open_mailto()
+
+        threading.Thread(target=submit, daemon=True).start()
+        self.after(100, check_result)
 
     def _open_mailto(self):
         url = "mailto:%s?subject=%s&body=%s" % (

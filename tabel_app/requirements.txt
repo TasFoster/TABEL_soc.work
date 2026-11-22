@@ -11,3 +11,6 @@ openpyxl>=3.1  # чтение/запись .xlsx (услуги-деньги: ш�
 
 # Главное меню
 customtkinter>=5.2,<6
+
+python-docx>=1.1,<2
+pypdf>=5,<8

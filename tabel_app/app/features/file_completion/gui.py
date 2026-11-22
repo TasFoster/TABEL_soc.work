@@ -27,6 +27,8 @@ class CompletionWindow(tk.Toplevel):
         feedback.add_button(top, self, FEATURE_TITLE, side="right", padx=6)
         combo=ttk.Combobox(top,textvariable=self.kind,values=list(service.TYPES.values()),state='readonly',width=58)
         combo.pack(side='left');combo.bind('<<ComboboxSelected>>',lambda e:self.invalidate())
+        from .act_gui import open_editor
+        ttk.Button(self, text="Редактор актов Word…", command=lambda: open_editor(self)).pack(anchor="w", padx=10)
         actions=ttk.Frame(self,padding=8);actions.pack(fill='x')
         for title,command in [('Добавить RTF / ZIP',self.add),('Удалить выбранные',self.remove),('Правила',self.rules),('Проверить и подготовить',self.prepare),('Различия',self.diff)]:
             ttk.Button(actions,text=title,command=command).pack(side='left',padx=3)

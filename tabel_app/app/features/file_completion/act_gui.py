@@ -47,7 +47,10 @@ def open_editor(parent):
             for name in paths:
                 try:
                     target = prepare(Path(name), Path(folder), month, signed, worker, director)
-                    report.append(target.name)
+                    if target.suffix == ".rtf":
+                        report.append(f"{target.name} — сохранён в RTF. Проверьте разбивку на страницы перед печатью.")
+                    else:
+                        report.append(target.name)
                 except Exception as exc:
                     report.append(f"{Path(name).name}: {exc}")
             queue.put(report)

@@ -138,7 +138,30 @@ def check_for_update():
 
     Бросает при сетевой/форматной ошибке — вызывающий решает, молчать (тихая проверка)
     или показать предупреждение (явная проверка по кнопке)."""
-    manifest = _http_get_json(_manifest_url())
+    if os.environ.get("TABEL_UPDATE_MANIFEST"):
+        return _read_update(_manifest_url(), "override")
+    candidates = []
+    errors = []
+    for source in ("github", "yandex"):
+        try:
+            url = GITHUB_MANIFEST_URL if source == "github" else _yadisk_href(MANIFEST_PATH)
+            info = _read_update(url, source)
+            if info:
+                candidates.append(info)
+        except Exception as exc:
+            errors.append(f"{source}: {exc}")
+    if not candidates:
+        if len(errors) == 2:
+            raise UpdateError("\n".join(errors))
+        return None
+    best = max(candidates, key=lambda item: parse_version(item["version"]))
+    best["mirrors"] = [item["url"] for item in candidates if item is not best
+                       and item["version"] == best["version"] and item["sha256"] == best["sha256"]]
+    return best
+
+
+def _read_update(url, source):
+    manifest = _http_get_json(url)
     if int(manifest.get("schema", 0)) != _SCHEMA:
         raise UpdateError("Неподдерживаемый формат манифеста обновления.")
     entry = (manifest.get("latest") or {}).get(variant_key())
@@ -150,7 +173,7 @@ def check_for_update():
     digest = (entry.get("sha256") or "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise UpdateError("В манифесте отсутствует корректная контрольная сумма SHA-256.")
-    url = _download_url(entry)
+    url = _yadisk_href(entry["path"]) if source == "yandex" else _download_url(entry)
     if not url.lower().startswith("https://") and not _allow_insecure():
         raise UpdateError("Ссылка на обновление не защищена (не https).")
     return {

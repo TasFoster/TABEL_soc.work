@@ -88,7 +88,8 @@ jobs:
           $target = gh release view $tag --json targetCommitish --jq .targetCommitish
           if ($LASTEXITCODE -ne 0 -or $target -ne $env:GITHUB_SHA) { throw 'Draft tag does not match this build' }
           $out = "$env:RUNNER_TEMP/tabel-release"
-          gh release upload $tag "$out/Tabel-full-setup.exe" "$out/Tabel-lite-setup.exe" "$out/version.json" --clobber
+          Compress-Archive -LiteralPath "$out/Tabel-full-setup.exe","$out/Tabel-lite-setup.exe","$out/version.json" -DestinationPath "$out/Tabel-Yandex.zip"
+          gh release upload $tag "$out/Tabel-full-setup.exe" "$out/Tabel-lite-setup.exe" "$out/version.json" "$out/Tabel-Yandex.zip" --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Upload failed; release remains draft' }
           gh release edit $tag --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Cannot publish release' }

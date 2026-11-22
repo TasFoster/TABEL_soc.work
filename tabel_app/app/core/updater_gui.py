@@ -158,9 +158,16 @@ class UpdateDialog(tk.Toplevel):
         def work():
             try:
                 if not (os.path.exists(dest) and updater.verify_sha256(dest, info.get("sha256"))):
-                    updater.download(info["url"], dest, progress)
-                    if not updater.verify_sha256(dest, info.get("sha256")):
-                        raise updater.UpdateError("Контрольная сумма не совпала.")
+                    urls = [info["url"], *info.get("mirrors", [])]
+                    for index, url in enumerate(urls):
+                        try:
+                            updater.download(url, dest, progress)
+                            if not updater.verify_sha256(dest, info["sha256"]):
+                                raise updater.UpdateError("Контрольная сумма не совпала.")
+                            break
+                        except Exception:
+                            if index == len(urls) - 1:
+                                raise
                 self.after(0, lambda: on_done(dest))
             except Exception as e:  # noqa: BLE001
                 self.after(0, lambda error=e: self._fail(error))

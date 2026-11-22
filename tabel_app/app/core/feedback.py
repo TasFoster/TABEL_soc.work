@@ -13,13 +13,16 @@ import getpass
 import json
 import os
 import queue
+import tempfile
+from pathlib import Path
+from .feedback_mail import make_draft
 import threading
 import sys
 import tkinter as tk
 import urllib.parse
 import urllib.request
 import webbrowser
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .version import APP_VERSION_DISPLAY, app_variant
 
@@ -94,6 +97,7 @@ class FeedbackDialog(tk.Toplevel):
         self.grab_set()
         self.feature_title = feature_title
         self.info = _system_info(feature_title)
+        self.attachments = []
         self._build()
 
     def _build(self):
@@ -114,6 +118,13 @@ class FeedbackDialog(tk.Toplevel):
         self.text = tk.Text(self, height=12, wrap="word")
         self.text.pack(fill="both", expand=True, padx=10)
         self.text.focus_set()
+        files = ttk.Frame(self)
+        files.pack(fill="x", padx=10)
+        self.attach_button = ttk.Button(files, text="Прикрепить файлы…", command=self._attach)
+        self.attach_button.pack(side="left")
+        ttk.Button(files, text="Убрать выбранные", command=self._remove).pack(side="left", padx=4)
+        self.file_list = tk.Listbox(self, height=3, selectmode="extended")
+        self.file_list.pack(fill="x", padx=10)
         info_str = "; ".join(f"{k}: {v}" for k, v in self.info.items())
         ttk.Label(self, text="К письму добавится → " + info_str, wraplength=520,
                   foreground="#888").pack(fill="x", padx=10, pady=(4, 0))
@@ -123,6 +134,46 @@ class FeedbackDialog(tk.Toplevel):
         self.send_button.pack(side="right")
         ttk.Button(bar, text="Скопировать", command=self._copy).pack(side="right", padx=6)
         ttk.Button(bar, text="Закрыть", command=self.destroy).pack(side="left")
+
+    def _attach(self):
+        for path in filedialog.askopenfilenames(parent=self, title="Образцы для разработчика"):
+            if path not in self.attachments:
+                self.attachments.append(path)
+                self.file_list.insert("end", Path(path).name)
+        self._update_send_label()
+
+    def _remove(self):
+        for index in reversed(self.file_list.curselection()):
+            del self.attachments[index]
+            self.file_list.delete(index)
+        self._update_send_label()
+
+    def _update_send_label(self):
+        self.send_button.configure(text="Открыть письмо в почте…" if self.attachments else "Отправить")
+
+    def _open_attached_draft(self):
+        try:
+            content = make_draft(FEEDBACK_EMAIL, self._subject(), self._body(), self.attachments)
+        except OSError as exc:
+            messagebox.showerror("Вложения", str(exc), parent=self)
+            return
+        if os.name == "nt":
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".eml", delete=False) as draft:
+                    draft.write(content)
+                os.startfile(draft.name)
+                messagebox.showinfo("Черновик открыт", "Проверьте письмо и нажмите «Отправить» в почтовой программе.", parent=self)
+                return
+            except OSError:
+                pass
+        target = filedialog.asksaveasfilename(parent=self, title="Сохранить письмо для отправки из почтовой программы",
+                                             initialfile="Отзыв.eml", defaultextension=".eml")
+        if target:
+            try:
+                Path(target).write_bytes(content)
+                messagebox.showinfo("Черновик сохранён", "Откройте файл в почтовой программе и отправьте письмо.", parent=self)
+            except OSError as exc:
+                messagebox.showerror("Письмо", str(exc), parent=self)
 
     def _subject(self):
         return f"Табель — {self.cat_var.get()} — {self.feature_title or 'общее'}"
@@ -139,6 +190,9 @@ class FeedbackDialog(tk.Toplevel):
         if not self.text.get("1.0", "end").strip():
             messagebox.showinfo("Пусто", "Сначала напишите текст обращения.")
             return
+        if self.attachments:
+            self._open_attached_draft()
+            return
         if not WEB3FORMS_KEY:
             self._open_mailto()
             return
@@ -146,6 +200,7 @@ class FeedbackDialog(tk.Toplevel):
         subject, body = self._subject(), self._body()
         outcome = queue.SimpleQueue()
         self.send_button.configure(state="disabled", text="Отправка…")
+        self.attach_button.state(["disabled"])
         self.text.configure(state="disabled")
         for option in self.categories:
             option.state(["disabled"])
@@ -167,6 +222,7 @@ class FeedbackDialog(tk.Toplevel):
                 self.destroy()
                 return
             self.send_button.configure(state="normal", text="Отправить")
+            self.attach_button.state(["!disabled"])
             self.text.configure(state="normal")
             for option in self.categories:
                 option.state(["!disabled"])

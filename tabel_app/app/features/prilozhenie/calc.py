@@ -138,3 +138,23 @@ def freed_per_day(worker, sector, default_value=None):
 
 def _fmt(v):
     return int(v) if float(v) == int(v) else round(v, 2)
+
+
+def unassigned_ranges(worker, sector, start, end, periods, assignments):
+    """Одинаковый остаток нагрузки на смежные дни отсутствия."""
+    ranges = []
+    for day in range(start, end + 1):
+        load = worker.load(sector)
+        for period in periods:
+            if (period.employee_id == worker.employee_id and period.sector == sector
+                    and period.day_from <= day <= period.day_to):
+                load = period.value
+        used = sum(row.value for row in assignments if row.sector == sector
+                   and row.from_employee_id == worker.employee_id and row.day_from <= day <= row.day_to)
+        remaining = round(load - used, 8)
+        if remaining > 0:
+            if ranges and ranges[-1][1] == day - 1 and ranges[-1][2] == remaining:
+                ranges[-1] = (ranges[-1][0], day, remaining)
+            else:
+                ranges.append((day, day, remaining))
+    return ranges

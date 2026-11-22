@@ -1,5 +1,6 @@
 """Графический интерфейс функции «Приложение к табелю» (Tkinter)."""
 
+import math
 import datetime
 import os
 import tkinter as tk
@@ -8,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 from ..timesheet.calendar_ru import MONTHS_NOM
 from . import FEATURE_TITLE, service, storage
 from ...core import documents, feedback, ui_state
+from .calc import unassigned_ranges
 from .model import SECTOR_LABEL, THRESHOLD, Absence, Period, Redistribution
 
 CODE_LABELS = {
@@ -566,6 +568,7 @@ class RedistributionDialog(tk.Toplevel):
         self.tree.column("frm", anchor="w")
         self.tree.column("to", anchor="w")
         self.tree.pack(fill="both", expand=True, padx=10, pady=6)
+        self.tree.bind("<Double-1>", self._edit_row)
         self._refresh()
 
         bar = ttk.Frame(self)
@@ -594,25 +597,46 @@ class RedistributionDialog(tk.Toplevel):
     def _auto(self):
         """Для каждого отсутствующего создать заготовки переноса (получатель пуст)."""
         ndays = service.days_in_month(self.year, self.month)
-        added = 0
-        for a in self.absences:
-            w = self.by_id.get(a.employee_id)
-            if not w:
+        periods = storage.get_periods(self.dept_id, self.year, self.month)
+        offered = False
+        for absence in self.absences:
+            worker = self.by_id.get(absence.employee_id)
+            if worker is None:
                 continue
             for sector in ("gor", "chast"):
-                load = w.load(sector)
-                if load > 0:
-                    dlg = RedistRowDialog(self, self.workers, sector, a.employee_id,
-                                          a.day_from, a.day_to, load, ndays,
-                                          title=f"{w.fio}: {SECTOR_LABEL[sector]} {a.day_from}–{a.day_to}")
+                while True:
+                    ranges = unassigned_ranges(worker, sector, absence.day_from, absence.day_to,
+                                               periods, self.items)
+                    if not ranges:
+                        break
+                    start, end, load = ranges[0]
+                    offered = True
+                    dlg = RedistRowDialog(self, self.workers, sector, worker.employee_id,
+                                          start, end, load, ndays, bounded=True,
+                                          title=f"{worker.fio}: {SECTOR_LABEL[sector]} {start}–{end}")
                     self.wait_window(dlg)
-                    if dlg.result:
-                        self.items.append(dlg.result)
-                        added += 1
-        self._refresh()
-        if not added:
-            messagebox.showinfo("Авто-черновик",
-                                "Нет отсутствий с ненулевой нагрузкой для перераспределения.")
+                    if not dlg.result:
+                        break
+                    self.items.append(dlg.result)
+                    self._refresh()
+        if not offered:
+            messagebox.showinfo("Авто-черновик", "Свободной нагрузки по отсутствиям нет.", parent=self)
+
+    def _edit_row(self, event=None):
+        selection = self.tree.selection()
+        if not selection:
+            return
+        index = int(selection[0])
+        row = self.items[index]
+        dlg = RedistRowDialog(self, self.workers, row.sector, row.from_employee_id,
+                              row.day_from, row.day_to, row.value,
+                              service.days_in_month(self.year, self.month))
+        if row.to_employee_id in dlg._ids:
+            dlg.to_cb.current(dlg._ids.index(row.to_employee_id))
+        self.wait_window(dlg)
+        if dlg.result:
+            self.items[index] = dlg.result
+            self._refresh()
 
     def _add(self):
         ndays = service.days_in_month(self.year, self.month)
@@ -634,7 +658,7 @@ class RedistributionDialog(tk.Toplevel):
 
 
 class RedistRowDialog(tk.Toplevel):
-    def __init__(self, master, workers, sector, from_eid, df, dt, value, ndays, title="Перенос"):
+    def __init__(self, master, workers, sector, from_eid, df, dt, value, ndays, title="Перенос", bounded=False):
         super().__init__(master)
         self.title(title)
         self.resizable(False, False)
@@ -643,18 +667,21 @@ class RedistRowDialog(tk.Toplevel):
         self.result = None
         self.ndays = ndays
         self.workers = workers
+        self.bounds = (df, dt, value) if bounded else None
         self._names = [w.fio for w in workers]
         self._ids = [w.employee_id for w in workers]
 
         ttk.Label(self, text="Сектор:").grid(row=0, column=0, sticky="e", padx=8, pady=4)
         self.sector_var = tk.StringVar(value=SECTOR_LABEL[sector])
-        ttk.Combobox(self, textvariable=self.sector_var, state="readonly",
+        ttk.Combobox(self, textvariable=self.sector_var, state="disabled" if bounded else "readonly",
                      values=["гор.", "част"], width=8).grid(row=0, column=1, sticky="w", padx=8)
 
         ttk.Label(self, text="От кого:").grid(row=1, column=0, sticky="e", padx=8, pady=4)
         self.from_cb = ttk.Combobox(self, values=self._names, state="readonly", width=34)
         if from_eid in self._ids:
             self.from_cb.current(self._ids.index(from_eid))
+        if bounded:
+            self.from_cb.state(["disabled"])
         self.from_cb.grid(row=1, column=1, sticky="w", padx=8)
 
         ttk.Label(self, text="Кому:").grid(row=2, column=0, sticky="e", padx=8, pady=4)
@@ -694,6 +721,14 @@ class RedistRowDialog(tk.Toplevel):
             messagebox.showerror("Число", "Чел/день должно быть числом.")
             return
         sector = "gor" if self.sector_var.get().startswith("гор") else "chast"
+        if not math.isfinite(val) or val <= 0:
+            messagebox.showerror("Нагрузка", "Укажите положительную нагрузку.", parent=self)
+            return
+        if self.bounds:
+            start, end, available = self.bounds
+            if df < start or dt > end or val > available:
+                messagebox.showerror("Замена", f"Доступно до {available:g} чел/день с {start} по {end}.", parent=self)
+                return
         self.result = Redistribution(sector, self._ids[fi], self._ids[ti], int(df), int(dt), val)
         self.destroy()
 

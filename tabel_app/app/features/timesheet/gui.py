@@ -141,6 +141,8 @@ class TimesheetWindow(tk.Toplevel):
         )
         ttk.Button(btns, text="Ставка, праздничные, ночные…", command=self._edit_indicators).pack(side="left")
 
+        ttk.Button(self, text="Замены сотрудников…", command=self._substitutions).pack(anchor="w", padx=10)
+
         bottom = ttk.Frame(self)
         bottom.pack(fill="x", **pad)
         ttk.Button(bottom, text="Реквизиты и подписи…", command=self._open_settings).pack(side="left")
@@ -215,6 +217,27 @@ class TimesheetWindow(tk.Toplevel):
     def _absence_text(self, n):
         items = self.absences.get(n, [])
         return "; ".join(f"{display_code(a['code'])}: {a['start']}–{a['end']}" for a in items)
+
+    def _substitutions(self):
+        from ..prilozhenie import storage as assignments
+        from ..prilozhenie.gui import RedistributionDialog
+        from ..prilozhenie.model import Absence
+        dept = self._current_dept()
+        if not dept:
+            return
+        year, month = self._current_year_month()
+        low, high = self._selected_period(days_in_month(year, month)) or (1, days_in_month(year, month))
+        absences = []
+        for employee in dept["employees"]:
+            for item in self.absences.get(employee["n"], []):
+                start, end = max(low, item["start"]), min(high, item["end"])
+                if start <= end:
+                    absences.append(Absence(employee["_db_id"], start, end, item["code"]))
+        dept_id = dept["_db_id"]
+        dlg = RedistributionDialog(self, dept_id, year, month, assignments.get_workers(dept_id), absences, None)
+        self.wait_window(dlg)
+        if dlg.saved:
+            assignments.save_redistributions(dept_id, year, month, dlg.items)
 
     def _selected_emp(self):
         sel = self.tree.selection()

@@ -555,7 +555,7 @@ class RedistributionDialog(tk.Toplevel):
         self.items = list(storage.get_redistributions(dept_id, year, month))
 
         info = ("Авто-черновик: освободившиеся чел/день отсутствующих можно раздать "
-                "присутствующим. Получателя выбираете вручную. Город и частный — раздельно.")
+                "нескольким сотрудникам. Укажите даты и долю первого — остаток будет предложен следующему. Двойной щелчок меняет строку.")
         ttk.Label(self, text=info, wraplength=690, foreground="#444").pack(padx=10, pady=(8, 4), anchor="w")
 
         cols = ("sector", "frm", "to", "from_day", "to_day", "value")

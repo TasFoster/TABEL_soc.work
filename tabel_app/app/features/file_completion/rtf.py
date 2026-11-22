@@ -64,8 +64,8 @@ def escape(text):
                    for ch in text)
 
 
-def replace(raw, start, end, replacement):
-    text, spans = parse(raw)
+def replace(raw, start, end, replacement, parsed=None):
+    text, spans = parsed if parsed is not None else parse(raw)
     tokens = sorted(set(spans[start:end]))
     if '\n' in text[start:end] and '\n' not in replacement:
         # При схлопывании нескольких абзацев их поздние \pard сбрасывают
@@ -84,9 +84,12 @@ def replace(raw, start, end, replacement):
         raise ValueError('Пустая область замены.')
     # Удаляются только текстовые токены, управляющие группы и стили остаются.
     source = raw.decode('latin1')
-    for a,b in reversed(tokens):
-        # Удаляем и fallback символ после Unicode-токена.
-        if source[a:b].startswith('\\u') and b < len(source) and source[b] == '?':
+    parts = [source[:tokens[0][0]], escape(replacement)]
+    cursor = tokens[0][0]
+    for a, b in tokens:
+        parts.append(source[cursor:a])
+        if source.startswith('\\u', a) and source[b:b + 1] == '?':
             b += 1
-        source = source[:a] + (escape(replacement) if a == tokens[0][0] else '') + source[b:]
-    return source.encode('latin1')
+        cursor = b
+    parts.append(source[cursor:])
+    return ''.join(parts).encode('latin1')

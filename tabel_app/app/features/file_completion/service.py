@@ -36,7 +36,8 @@ def locate_before(text, rule):
 
 def transform(raw, kind, rules):
     validate_rules(rules)
-    text, _ = rtf.parse(raw)
+    parsed = rtf.parse(raw)
+    text = parsed[0]
     if kind not in TYPES:
         raise ValueError('Неизвестный тип договора.')
     # Тип определяется заголовком внутри документа, а не именем файла.
@@ -73,10 +74,11 @@ def transform(raw, kind, rules):
         raise ValueError('Часть дополнений уже внесена. Требуется ручная проверка.')
     result = raw
     for rule in rules[kind]:
-        current, _ = rtf.parse(result)
-        for m in reversed(locate_before(current,rule)):
-            result = rtf.replace(result,m.start(),m.end(),rule['after'])
-    final, _ = rtf.parse(result)
+        # При замене справа налево смещения слева остаются действительными.
+        for m in reversed(locate_before(parsed[0], rule)):
+            result = rtf.replace(result, m.start(), m.end(), rule['after'], parsed)
+        parsed = rtf.parse(result)
+    final = parsed[0]
     for rule in rules[kind]:
         if len(locate(final, rule['after'])) != rule['count']:
             raise ValueError('Не удалось проверить результат.')

@@ -6,8 +6,8 @@ from tkinter.scrolledtext import ScrolledText
 from ...core import feedback
 from . import FEATURE_TITLE, service, storage
 
-HELP = '''1. Выберите вид договора или «Акты на государственные и дополнительные услуги» в списке сверху.
-2. Добавьте один/несколько RTF или ZIP с документами. В одном запуске обрабатывается выбранный вид документа. Для актов меняется только подписант: директор → директор филиала; ФИО и должность доступны в правилах.
+HELP = '''1. Выберите вид документа в списке сверху. Для допсоглашений используйте «Допсоглашения на дополнительные услуги».
+2. Добавьте один/несколько RTF или ZIP с документами. В одном запуске обрабатывается выбранный вид документа. Для актов меняется только подписант. В допсоглашениях заполняются ФИО директора филиала и реквизиты доверенности в обоих блоках подписи. Эти данные доступны в правилах.
 3. Нажмите «Проверить и подготовить». Выделите файл и откройте «Различия»: минус — удаление, плюс — добавление. Предпросмотр не записывает результат.
 4. Сохраните подготовленные результаты в отдельную папку или новый ZIP. Исходники не меняются. Уже готовые договоры пропускаются; ошибки одного файла не мешают остальным.
 Неверный тип, частично дополненный или незнакомый документ требует ручной проверки. Не переименовывайте DOC/DOCX в RTF — сначала сохраните его как RTF в офисной программе.
@@ -41,7 +41,7 @@ class CompletionWindow(tk.Toplevel):
         bottom=ttk.Frame(self,padding=8);bottom.pack(fill='x')
         ttk.Button(bottom,text='Сохранить в папку',command=lambda:self.save(False)).pack(side='right')
         ttk.Button(bottom,text='Сохранить ZIP',command=lambda:self.save(True)).pack(side='right',padx=6)
-        self.status=tk.StringVar(value='Добавьте договоры для проверки.')
+        self.status=tk.StringVar(value='Добавьте документы для проверки.')
         ttk.Label(bottom,textvariable=self.status).pack(side='left')
         self.protocol('WM_DELETE_WINDOW',self.close)
 
@@ -59,7 +59,7 @@ class CompletionWindow(tk.Toplevel):
         self.refresh()
 
     def add(self):
-        paths=filedialog.askopenfilenames(parent=self,filetypes=[('Договоры и архивы','*.rtf *.zip')])
+        paths=filedialog.askopenfilenames(parent=self,filetypes=[('Документы и архивы','*.rtf *.zip')])
         if paths:
             self.rows.extend(service.read_inputs(paths));self.refresh()
 

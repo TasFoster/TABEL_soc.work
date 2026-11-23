@@ -11,6 +11,9 @@ RULES=json.loads((Path(__file__).resolve().parents[1]/'app/features/file_complet
 def document(kind):
     title='Договор о предоставлении дополнительных социальных услуг' if kind=='additional' else 'Договор о предоставлении социальных услуг'
     if kind=='additional_act':title='Акт сдачи-приемки оказанных дополнительных услуг'
+    if kind=='additional_agreement':
+        title = ('Дополнительное соглашение № 12-З-09\n'
+                 'к договору о предоставлении дополнительных социальных услуг')
     amount='0,00' if kind=='free' else '120,00'
     text=title+'\nСтоимость Услуг, предусмотренных настоящим Договором, составляет '+amount+' рублей в месяц.\nКлиент Тестов, паспорт 1234, номер 42\n'
     for rule in RULES[kind]:text+=(rule['before']+'\n')*rule['count']
@@ -38,6 +41,33 @@ class CompletionTests(unittest.TestCase):
         self.assertTrue(diff)
         self.assertEqual(rtf.parse(result)[0], rtf.parse(raw)[0].replace(rule['before'], rule['after']))
         self.assertEqual(service.transform(result, 'additional', RULES)[2], '')
+
+    def test_additional_agreement_changes_only_signature_fields(self):
+        kind = 'additional_agreement'
+        signature, authority = RULES[kind]
+        block = ('Директор\n' + signature['before'] + '\nподпись руководителя\n'
+                 + authority['before'] + '\nМ.П.\tТестов Тест Тестович/___________\n')
+        text = ('Дополнительное соглашение № 12-З-09\n'
+                'к договору о предоставлении дополнительных социальных услуг\n'
+                'Заказчик: Тестов Тест Тестович\n' + block * 2)
+        raw = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(text) + '}').encode('ascii')
+        result, _, diff = service.transform(raw, kind, RULES)
+        expected = text.replace(signature['before'], signature['after']).replace(
+            authority['before'], authority['after'])
+        self.assertTrue(diff)
+        self.assertEqual(rtf.parse(result)[0], expected)
+        self.assertEqual(service.transform(result, kind, RULES)[2], '')
+
+        match = service.locate(text, signature['before'])[0]
+        partial = rtf.replace(raw, *match.span(), signature['after'])
+        with self.assertRaises(ValueError):
+            service.transform(partial, kind, RULES)
+
+        with tempfile.TemporaryDirectory() as directory:
+            rows = [{'name': 'draft.rtf', 'result': result, 'changed': True}]
+            service.save_results(rows, directory)
+            self.assertEqual([p.name for p in Path(directory).iterdir()],
+                             ['Тестов_Тест_Тестович_допсоглашение.rtf'])
 
     def test_partial_unknown_and_malformed(self):
         raw=document('free');text,_=rtf.parse(raw)
@@ -91,12 +121,13 @@ class CompletionTests(unittest.TestCase):
         from app.features.file_completion import storage
         with tempfile.TemporaryDirectory() as directory, patch('app.core.storage.app_base_dir',return_value=directory):
             folder=Path(directory)/'data/file_completion';folder.mkdir(parents=True)
-            previous={k:v for k,v in RULES.items() if k!='additional_act'}
+            previous={k:v for k,v in RULES.items() if k not in ('additional_act', 'additional_agreement')}
             previous['free']=[dict(r) for r in previous['free']]
             previous['free'][0]['after']='Заказчик получает услуги без оплаты.'
             (folder/'rules.json').write_text(json.dumps(previous),encoding='utf-8')
             loaded=storage.load_rules()
             self.assertIn('additional_act',loaded)
+            self.assertIn('additional_agreement', loaded)
             self.assertEqual(loaded['free'][0]['after'],'Заказчик получает услуги без оплаты.')
             service.validate_rules(loaded)
 

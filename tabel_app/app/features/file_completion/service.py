@@ -7,7 +7,13 @@ from .names import recipient
 from . import rtf
 TYPES = {'additional':'Договоры на дополнительные услуги', 'free':'Договоры на бесплатные услуги',
          'paid':'Договоры на государственные услуги — платные',
-         'additional_act':'Акты на государственные и дополнительные услуги'}
+         'additional_act':'Акты на государственные и дополнительные услуги',
+         'additional_agreement':'Допсоглашения на дополнительные услуги'}
+AGREEMENT_TITLE = re.compile(
+    r'^Дополнительное\s+соглашение(?:[ \t]+№[^\n]+)?\s+'
+    r'к\s+договору\s+о\s+предоставлении\s+дополнительных\s+социальных\s+услуг\b',
+    re.I | re.M,
+)
 
 
 def validate_rules(rules):
@@ -48,8 +54,11 @@ def transform(raw, kind, rules):
                          r'(?:государственных|дополнительных)\s+услуг', text, re.I))
     if act != (kind == 'additional_act'):
         raise ValueError('Тип документа не соответствует выбранному: акт или договор.')
+    agreement = bool(AGREEMENT_TITLE.search(text))
+    if agreement != (kind == 'additional_agreement'):
+        raise ValueError('Тип документа не соответствует выбранному: дополнительное соглашение или другой документ.')
     additional = 'Договор о предоставлении дополнительных социальных услуг' in text
-    if not act and additional != (kind == 'additional'):
+    if not act and not agreement and additional != (kind == 'additional'):
         raise ValueError('Тип договора не соответствует выбранному.')
     if kind in ('free','paid'):
         match = re.search(r'Стоимость\s+Услуг,\s+предусмотренных\s+настоящим\s+Договором,\s+составляет\s+([\d ,\.]+)', text)
@@ -124,7 +133,10 @@ def save_results(rows, destination, zipped=False):
             stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', Path(row['name'].split(' / ')[-1]).stem).rstrip('. ')[:120] or 'договор'
             text, _ = rtf.parse(row['result'])
             client = recipient(text)
-            kind = 'акт' if re.search(r'^Акт сдачи', text, re.M | re.I) else 'договор'
+            if AGREEMENT_TITLE.search(text):
+                kind = 'допсоглашение'
+            else:
+                kind = 'акт' if re.search(r'^Акт сдачи', text, re.M | re.I) else 'договор'
             base = f'{client}_{kind}' if client else f'{i:03d}_{stem}_готовый'
             name = base + '.rtf'
             serial = 2

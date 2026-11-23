@@ -23,8 +23,6 @@ class ReferenceWindow(tk.Toplevel):
         self._build()
 
     def _build(self):
-        ttk.Label(self, text="Общие справочники приложения — используются всеми функциями.",
-                  wraplength=410, foreground="#555", justify="left").pack(fill="x", padx=12, pady=(12, 8))
         items = [
             ("Отделения и сотрудники", self._open_departments),
             ("Производственный календарь", self._open_calendar),
@@ -33,10 +31,14 @@ class ReferenceWindow(tk.Toplevel):
             ("Телефоны клиентов (Проверка качества)", self._open_pk_phones),
             ("Экспорт / импорт данных…", self._transfer),
         ]
+        actions = ttk.Frame(self)
+        actions.pack(fill="x", padx=12, pady=(8, 0))
         for text, cmd in items:
-            ttk.Button(self, text=text, command=cmd).pack(fill="x", padx=12, pady=4)
-        feedback.add_button(self, self, self.title(), pady=4)
-        ttk.Button(self, text="Закрыть", command=self.destroy).pack(pady=(10, 0))
+            ttk.Button(actions, text=text, command=cmd).pack(fill="x", pady=3)
+        bottom = ttk.Frame(self)
+        bottom.pack(side="bottom", fill="x", before=actions, padx=12, pady=8)
+        feedback.add_button(bottom, self, self.title(), side="left")
+        ttk.Button(bottom, text="Закрыть", command=self.destroy).pack(side="right")
 
     def _run(self, factory):
         """Открыть редактор-Toplevel и подождать его закрытия; ошибки — в messagebox."""
@@ -87,12 +89,12 @@ class ReferenceWindow(tk.Toplevel):
         win = tk.Toplevel(self)
         win.title("Экспорт / импорт данных")
         win.geometry("480x230")
+        win.minsize(440, 220)
         win.transient(self)
         win.grab_set()
-        ttk.Label(win, wraplength=410, justify="left",
-                  text=("Перенос всех данных между компьютерами одним файлом базы "
-                        "(отделения, сотрудники, клиенты, нагрузки, календарь, настройки, черновики и история протоколов).")
-                  ).pack(fill="x", padx=12, pady=(12, 8))
+        description = ttk.Label(win, wraplength=410, justify="left",
+                                text="Перенос всех данных приложения между компьютерами одним файлом базы.")
+        description.pack(fill="x", padx=12, pady=(12, 8))
 
         def do_export():
             dest = filedialog.asksaveasfilename(parent=win, title="Экспорт данных",
@@ -126,8 +128,10 @@ class ReferenceWindow(tk.Toplevel):
                                      f"Не удалось импортировать (файл не является базой «Табеля»?):\n{e}",
                                      parent=win)
 
-        ttk.Button(win, text="Экспорт данных в файл…", command=do_export).pack(fill="x", padx=12, pady=4)
-        ttk.Button(win, text="Импорт данных из файла…", command=do_import).pack(fill="x", padx=12, pady=4)
+        actions = ttk.Frame(win)
+        actions.pack(side="bottom", fill="x", before=description, padx=12, pady=8)
+        ttk.Button(actions, text="Экспорт данных в файл…", command=do_export).pack(fill="x", pady=4)
+        ttk.Button(actions, text="Импорт данных из файла…", command=do_import).pack(fill="x", pady=4)
 
 
 def open_reference(master):

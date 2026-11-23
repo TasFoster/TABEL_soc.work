@@ -139,21 +139,20 @@ class TimesheetWindow(tk.Toplevel):
         ttk.Button(btns, text="− Убрать отсутствия у сотрудника", command=self._clear_absence).pack(
             side="left", padx=6
         )
-        ttk.Button(btns, text="Ставка, праздничные, ночные…", command=self._edit_indicators).pack(side="left")
-
-        ttk.Button(self, text="Замены сотрудников…", command=self._substitutions).pack(anchor="w", padx=10)
+        extras = ttk.Frame(self)
+        extras.pack(fill="x", **pad)
+        ttk.Button(extras, text="Ставка, праздничные, ночные…", command=self._edit_indicators).pack(side="left")
+        ttk.Button(extras, text="Замены сотрудников…", command=self._substitutions).pack(side="left", padx=6)
+        ttk.Button(extras, text="Реквизиты и подписи…", command=self._open_settings).pack(side="left")
 
         bottom = ttk.Frame(self)
         bottom.pack(fill="x", **pad)
-        ttk.Button(bottom, text="Реквизиты и подписи…", command=self._open_settings).pack(side="left")
-        ttk.Button(bottom, text="Производственный календарь…", command=self._open_calendar).pack(
-            side="left", padx=6
-        )
+        ttk.Button(bottom, text="Производственный календарь…", command=self._open_calendar).pack(side="left")
+        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=6)
         self.gen_btn = ttk.Button(bottom, text="Сформировать табель", command=self._generate)
         self.gen_btn.pack(side="right")
         self.status = ttk.Label(bottom, text="")
         self.status.pack(side="right", padx=10)
-        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
 
     # ----------------------------------------------------------- helpers
     def _current_dept(self):
@@ -468,6 +467,7 @@ class DepartmentManager(tk.Toplevel):
         super().__init__(master)
         self.title("Отделения и сотрудники")
         self.geometry("760x520")
+        self.minsize(690, 350)
         self.transient(master)
         self.grab_set()
         self.data = departments
@@ -802,6 +802,7 @@ class CalendarDialog(tk.Toplevel):
         super().__init__(master)
         self.title("Производственный календарь")
         self.geometry("560x540")
+        self.minsize(440, 330)
         self.transient(master)
         self.grab_set()
         self.saved = False
@@ -942,6 +943,7 @@ class IndicatorsDialog(tk.Toplevel):
             row=6, column=0, columnspan=2, padx=10, pady=8)
         ttk.Button(self, text="Сохранить", command=self._save).grid(row=7, column=0, pady=8)
         ttk.Button(self, text="Отмена", command=self.destroy).grid(row=7, column=1, pady=8)
+        self.resizable(False, False)
 
     def _save(self):
         try:

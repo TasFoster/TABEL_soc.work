@@ -63,7 +63,7 @@ class UpdateDialog(tk.Toplevel):
         self.kind = updater.installation_kind()
         self.title("Обновление программы")
         self.geometry("480x340")
-        self.minsize(420, 300)
+        self.minsize(460, 300)
         self.transient(master)
         self.grab_set()
         self._build()
@@ -85,7 +85,7 @@ class UpdateDialog(tk.Toplevel):
         self.prog = ttk.Progressbar(self, mode="determinate")
 
         bar = ttk.Frame(self)
-        bar.pack(fill="x", **pad)
+        bar.pack(side="bottom", fill="x", before=box, **pad)
         if self.kind == "installed":
             self.ok = ttk.Button(bar, text="Обновить сейчас", command=self._update_installed)
         else:

@@ -84,11 +84,13 @@ class ReestrOplataWindow(tk.Toplevel):
         self.apply_btn.pack(side="right")
         ttk.Button(bottom, text="Шапка…", command=self._edit_header).pack(side="left")
         ttk.Button(bottom, text="Пересмотр…", command=self._edit_marks).pack(side="left")
-        ttk.Button(bottom, text="Снять все", command=lambda: self._mark_all(False)).pack(
+        selection = ttk.Frame(self)
+        selection.pack(side="bottom", fill="x", **pad)
+        ttk.Button(selection, text="Снять все", command=lambda: self._mark_all(False)).pack(
             side="right", padx=4)
-        ttk.Button(bottom, text="Отметить все", command=lambda: self._mark_all(True)).pack(
+        ttk.Button(selection, text="Отметить все", command=lambda: self._mark_all(True)).pack(
             side="right", padx=4)
-        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=6)
 
     # ------------------------------------------------------------------ файлы
     def _pick_ods(self):

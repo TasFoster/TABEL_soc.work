@@ -12,6 +12,7 @@ from .act_editor import prepare, signing_day
 def open_editor(parent):
     window = Toplevel(parent)
     window.title("Редактор актов")
+    window.resizable(False, False)
     month = date.today()
     production = ProductionCalendar(load_calendar())
     ttk.Label(window, text=f"Период услуг: {month:%m.%Y}").pack(pady=5)

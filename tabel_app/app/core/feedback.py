@@ -102,9 +102,6 @@ class FeedbackDialog(tk.Toplevel):
 
     def _build(self):
         pad = {"padx": 10, "pady": 6}
-        ttk.Label(self, text=("Сообщите о проблеме или предложите нужную функцию — "
-                              "письмо уйдёт разработчику."),
-                  wraplength=520, foreground="#444").pack(fill="x", **pad)
         cf = ttk.Frame(self)
         cf.pack(fill="x", **pad)
         ttk.Label(cf, text="Тип:").pack(side="left")
@@ -115,7 +112,7 @@ class FeedbackDialog(tk.Toplevel):
             option.pack(side="left", padx=(6, 0))
             self.categories.append(option)
         ttk.Label(self, text="Опишите подробно:").pack(anchor="w", padx=10)
-        self.text = tk.Text(self, height=12, wrap="word")
+        self.text = tk.Text(self, height=6, wrap="word")
         self.text.pack(fill="both", expand=True, padx=10)
         self.text.focus_set()
         files = ttk.Frame(self)
@@ -126,10 +123,10 @@ class FeedbackDialog(tk.Toplevel):
         self.file_list = tk.Listbox(self, height=3, selectmode="extended")
         self.file_list.pack(fill="x", padx=10)
         info_str = "; ".join(f"{k}: {v}" for k, v in self.info.items())
-        ttk.Label(self, text="К письму добавится → " + info_str, wraplength=520,
+        ttk.Label(self, text="К письму добавится → " + info_str, wraplength=450,
                   foreground="#888").pack(fill="x", padx=10, pady=(4, 0))
         bar = ttk.Frame(self)
-        bar.pack(fill="x", **pad)
+        bar.pack(side="bottom", fill="x", before=self.text, **pad)
         self.send_button = ttk.Button(bar, text="Отправить", command=self._send)
         self.send_button.pack(side="right")
         ttk.Button(bar, text="Скопировать", command=self._copy).pack(side="right", padx=6)

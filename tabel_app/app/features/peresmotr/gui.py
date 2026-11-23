@@ -45,7 +45,7 @@ class PeresmotrWindow(tk.Toplevel):
         s = ttk.Frame(top)
         s.pack(fill="x", padx=6, pady=(0, 4))
         ttk.Label(s, text="Отчёт ИПСУ (.xls):").grid(row=0, column=0, sticky="w")
-        ttk.Entry(s, textvariable=self.src_var, width=46).grid(row=0, column=1, sticky="we", padx=4)
+        ttk.Entry(s, textvariable=self.src_var).grid(row=0, column=1, sticky="we", padx=4)
         ttk.Button(s, text="Обзор…", command=self._pick_source).grid(row=0, column=2)
         ttk.Button(s, text="Найти", command=self._find).grid(row=0, column=3, padx=6)
         s.columnconfigure(1, weight=1)

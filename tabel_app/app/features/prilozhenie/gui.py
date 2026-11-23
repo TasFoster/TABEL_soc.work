@@ -108,9 +108,11 @@ class PrilozhenieWindow(tk.Toplevel):
         ttk.Button(btns, text="Добавить / изменить сотрудников…", command=self._manage_workers).pack(side="left")
         ttk.Button(btns, text="Нагрузка сотрудника…", command=self._edit_load).pack(side="left")
         ttk.Button(btns, text="Нагрузка по периодам…", command=self._edit_periods).pack(side="left", padx=4)
-        ttk.Button(btns, text="+ Отсутствие", command=self._add_absence).pack(side="left", padx=4)
-        ttk.Button(btns, text="− Отсутствия", command=self._clear_absences).pack(side="left")
-        ttk.Button(btns, text="Перераспределение чел/дней…", command=self._redistribute).pack(side="left", padx=4)
+        adjustments = ttk.Frame(self)
+        adjustments.pack(fill="x", **pad)
+        ttk.Button(adjustments, text="+ Отсутствие", command=self._add_absence).pack(side="left")
+        ttk.Button(adjustments, text="− Отсутствия", command=self._clear_absences).pack(side="left", padx=4)
+        ttk.Button(adjustments, text="Перераспределение чел/дней…", command=self._redistribute).pack(side="left")
 
         self.warn = tk.Text(self, height=3, wrap="word", foreground="#b00", background="#fff7f7")
         self.warn.pack(fill="x", padx=8)
@@ -118,12 +120,11 @@ class PrilozhenieWindow(tk.Toplevel):
 
         bottom = ttk.Frame(self)
         bottom.pack(fill="x", **pad)
-        ttk.Label(bottom, text="(двойной клик по строке — нагрузка сотрудника)").pack(side="left")
+        feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
         self.gen_btn = ttk.Button(bottom, text="Сформировать приложение", command=self._generate)
         self.gen_btn.pack(side="right")
         self.status = ttk.Label(bottom, text="")
         self.status.pack(side="right", padx=10)
-        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
 
     # ----------------------------------------------------------- helpers
     def _current_dept_id(self):
@@ -397,6 +398,7 @@ class PeriodsEditor(tk.Toplevel):
         super().__init__(master)
         self.title("Нагрузка по периодам")
         self.geometry("460x360")
+        self.minsize(340, 260)
         self.transient(master)
         self.grab_set()
         self.saved = False
@@ -544,6 +546,7 @@ class RedistributionDialog(tk.Toplevel):
         super().__init__(master)
         self.title("Перераспределение чел/дней")
         self.geometry("720x460")
+        self.minsize(580, 330)
         self.transient(master)
         self.grab_set()
         self.saved = False

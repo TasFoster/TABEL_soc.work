@@ -46,15 +46,16 @@ class ProezdWindow(tk.Toplevel):
         fr = ttk.Frame(top)
         fr.pack(fill="x", padx=6, pady=4)
         ttk.Label(fr, text="Файл с поездками:").grid(row=0, column=0, sticky="w")
-        ttk.Entry(fr, textvariable=self.trips_var, width=64).grid(row=0, column=1, padx=4)
+        ttk.Entry(fr, textvariable=self.trips_var).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Button(fr, text="Обзор…", command=self._pick_trips).grid(row=0, column=2)
         ttk.Label(fr, text="Скан билетов:").grid(row=1, column=0, sticky="w", pady=2)
-        ttk.Entry(fr, textvariable=self.scan_var, width=64).grid(row=1, column=1, padx=4)
+        ttk.Entry(fr, textvariable=self.scan_var).grid(row=1, column=1, sticky="ew", padx=4)
         sb = ttk.Frame(fr)
         sb.grid(row=1, column=2)
         ttk.Button(sb, text="Обзор…", command=self._pick_scan).pack(side="left")
         ttk.Button(sb, text="Открыть", command=self._open_scan, width=8).pack(side="left", padx=2)
         ttk.Button(fr, text="Прочитать", command=self._read).grid(row=0, column=3, rowspan=2, padx=10)
+        fr.columnconfigure(1, weight=1)
 
         # период (месяц/год) + ФИО
         prm = ttk.Frame(self)

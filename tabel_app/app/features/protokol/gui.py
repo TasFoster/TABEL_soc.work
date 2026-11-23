@@ -41,8 +41,8 @@ class ProtokolWindow(tk.Toplevel):
         period = ttk.Frame(self, padding=8)
         period.pack(fill="x")
         self.department = ttk.Combobox(period, values=[d["name"] for d in self.departments],
-                                       state="readonly", width=44)
-        self.department.pack(side="left")
+                                       state="readonly", width=28)
+        self.department.pack(side="left", fill="x", expand=True)
         self.month = ttk.Combobox(period, values=service.MONTHS_NOM[1:], state="readonly", width=12)
         self.month.pack(side="left", padx=6)
         ttk.Spinbox(period, from_=1900, to=9999, textvariable=self.year, width=6).pack(side="left")
@@ -79,14 +79,18 @@ class ProtokolWindow(tk.Toplevel):
 
         agenda = ttk.Frame(tabs, padding=8)
         tabs.add(agenda, text="Повестка и докладчик")
-        ttk.Label(agenda, text="Повестка из плана методического часа, по одному пункту на строку").pack(anchor="w")
-        self._text_field(agenda, "agenda", 5)
-        ttk.Label(agenda, text="Заслушиваемые работники из плана — редактируйте, добавляйте и удаляйте строки").pack(anchor="w")
-        self._text_field(agenda, "planned_report", 3)
-        ttk.Button(agenda, text="Обновить заслушивания из плана", command=self._refresh_plan).pack(anchor="w")
-        ttk.Label(agenda, text="Замена докладчика (выберите сотрудника или впишите ФИО)").pack(anchor="w")
+        agenda.columnconfigure(0, weight=1)
+        agenda.rowconfigure(1, weight=5)
+        agenda.rowconfigure(3, weight=3)
+        ttk.Label(agenda, text="Повестка из плана методического часа, по одному пункту на строку").grid(row=0, sticky="w")
+        self._text_field(agenda, "agenda", 5, row=1)
+        ttk.Label(agenda, text="Заслушиваемые работники из плана — редактируйте, добавляйте и удаляйте строки",
+                  wraplength=600).grid(row=2, sticky="w")
+        self._text_field(agenda, "planned_report", 3, row=3)
+        ttk.Button(agenda, text="Обновить заслушивания из плана", command=self._refresh_plan).grid(row=4, sticky="w")
+        ttk.Label(agenda, text="Замена докладчика (выберите сотрудника или впишите ФИО)").grid(row=5, sticky="w")
         self.speaker_box = ttk.Combobox(agenda, textvariable=self.speaker)
-        self.speaker_box.pack(fill="x")
+        self.speaker_box.grid(row=6, sticky="ew")
 
         decisions = ttk.Frame(tabs, padding=8)
         tabs.add(decisions, text="Решения")
@@ -102,9 +106,9 @@ class ProtokolWindow(tk.Toplevel):
         more = ttk.Frame(self, padding=(8, 0))
         more.pack(fill="x")
         ttk.Button(more, text="Предварительный просмотр", command=self._preview).pack(side="left")
+        ttk.Button(more, text="Сохранить историю", command=self._save_history).pack(side="left", padx=6)
+        ttk.Button(more, text="История", command=self._history).pack(side="left")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
-        ttk.Button(bottom, text="Сохранить историю", command=self._save_history).pack(side="left")
-        ttk.Button(bottom, text="История", command=self._history).pack(side="left")
         ttk.Button(bottom, text="Сформировать ODT", command=self._generate).pack(side="right")
         ttk.Button(bottom, text="Сохранить черновик", command=self._save).pack(side="right", padx=6)
 
@@ -163,6 +167,7 @@ class ProtokolWindow(tk.Toplevel):
             return
         win = tk.Toplevel(self)
         win.title("История — дублирование в открытый период")
+        win.minsize(460, 300)
         win.transient(self)
         win.grab_set()
         listing = tk.Listbox(win, width=75, height=15, exportselection=False, selectmode="extended")
@@ -196,13 +201,19 @@ class ProtokolWindow(tk.Toplevel):
             self._show_text("Сравнение версий", [(line, "removed" if line.startswith("-") else "added" if line.startswith("+") else "body")
                                                for line in changes] or [("Отличий нет.", "body")], parent=win)
 
-        ttk.Label(win, text="Одна версия — сравнить с черновиком. Две (Ctrl) — между собой. Минус: исходная, плюс: новая.").pack(padx=8)
-        ttk.Button(win, text="Сравнить", command=compare).pack(pady=4)
-        ttk.Button(win, text="Дублировать одну версию в текущий период", command=duplicate).pack(pady=8)
+        actions = ttk.Frame(win)
+        actions.pack(side="bottom", fill="x", before=listing, padx=8)
+        ttk.Button(actions, text="Сравнить", command=compare).pack(pady=4)
+        ttk.Button(actions, text="Дублировать одну версию в текущий период", command=duplicate).pack(pady=8)
+        ttk.Label(win, text="Одна версия — сравнить с черновиком. Две (Ctrl) — между собой. Минус: исходная, плюс: новая.",
+                  wraplength=430).pack(side="bottom", before=listing, padx=8)
 
-    def _text_field(self, parent, key, height):
+    def _text_field(self, parent, key, height, *, row=None):
         field = ScrolledText(parent, wrap="word", height=height)
-        field.pack(fill="both", expand=True, pady=4)
+        if row is None:
+            field.pack(fill="both", expand=True, pady=4)
+        else:
+            field.grid(row=row, column=0, sticky="nsew", pady=4)
         self.fields[key] = field
 
     def _read_draft(self):
@@ -278,6 +289,7 @@ class ProtokolWindow(tk.Toplevel):
         person = self.people[index] if index is not None else {"name": "", "present": True, "reason": ""}
         win = tk.Toplevel(self)
         win.title("Участник")
+        win.resizable(False, False)
         win.transient(self)
         win.grab_set()
         form = ttk.Frame(win, padding=12)

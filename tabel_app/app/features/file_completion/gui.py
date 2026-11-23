@@ -20,25 +20,29 @@ class CompletionWindow(tk.Toplevel):
         super().__init__(master)
         self.title('Дополнение файлов')
         self.geometry('980x650')
+        self.minsize(700, 400)
         self.rows = []
         self.kind = tk.StringVar(value=next(iter(service.TYPES.values())))
         top = ttk.Frame(self, padding=8); top.pack(fill='x')
         ttk.Button(top,text='Помощь',command=lambda:self.show_text('Помощь',HELP)).pack(side='right')
         feedback.add_button(top, self, FEATURE_TITLE, side="right", padx=6)
-        combo=ttk.Combobox(top,textvariable=self.kind,values=list(service.TYPES.values()),state='readonly',width=58)
-        combo.pack(side='left');combo.bind('<<ComboboxSelected>>',lambda e:self.invalidate())
+        combo=ttk.Combobox(top,textvariable=self.kind,values=list(service.TYPES.values()),state='readonly',width=30)
+        combo.pack(side='left', fill='x', expand=True)
+        combo.bind('<<ComboboxSelected>>', lambda e: self.invalidate())
         from .act_gui import open_editor
         ttk.Button(self, text="Редактор актов…", command=lambda: open_editor(self)).pack(anchor="w", padx=10)
         actions=ttk.Frame(self,padding=8);actions.pack(fill='x')
         for title,command in [('Добавить RTF / ZIP',self.add),('Удалить выбранные',self.remove),('Правила',self.rules),('Проверить и подготовить',self.prepare),('Различия',self.diff)]:
             ttk.Button(actions,text=title,command=command).pack(side='left',padx=3)
-        self.table=ttk.Treeview(self,columns=('file','status'),show='headings',selectmode='extended')
+        preview = ttk.Frame(self, padding=(8, 0))
+        preview.pack(fill='both', expand=True)
+        self.table=ttk.Treeview(preview,columns=('file','status'),show='headings',selectmode='extended')
         self.table.heading('file',text='Файл');self.table.heading('status',text='Результат проверки')
         self.table.column('file',width=420);self.table.column('status',width=480)
-        scroll=ttk.Scrollbar(self,command=self.table.yview);scroll.pack(side='right',fill='y')
-        self.table.configure(yscrollcommand=scroll.set);self.table.pack(fill='both',expand=True,padx=8)
+        scroll=ttk.Scrollbar(preview,command=self.table.yview);scroll.pack(side='right',fill='y')
+        self.table.configure(yscrollcommand=scroll.set);self.table.pack(fill='both',expand=True)
         self.table.bind('<Double-1>',lambda e:self.diff())
-        bottom=ttk.Frame(self,padding=8);bottom.pack(fill='x')
+        bottom=ttk.Frame(self,padding=8);bottom.pack(side='bottom', fill='x')
         ttk.Button(bottom,text='Сохранить в папку',command=lambda:self.save(False)).pack(side='right')
         ttk.Button(bottom,text='Сохранить ZIP',command=lambda:self.save(True)).pack(side='right',padx=6)
         self.status=tk.StringVar(value='Добавьте документы для проверки.')
@@ -100,13 +104,15 @@ class CompletionWindow(tk.Toplevel):
         try:value=storage.load_rules()
         except Exception as exc:messagebox.showerror('Правила',str(exc),parent=self);return
         win=tk.Toplevel(self);win.title('Правила — before / after / count');win.geometry('950x700')
-        text=ScrolledText(win,wrap='word');text.pack(fill='both',expand=True)
+        win.minsize(360, 240)
+        text=ScrolledText(win,wrap='word')
         text.insert('1.0',json.dumps(value,ensure_ascii=False,indent=2))
         def save():
             try:storage.save_rules(json.loads(text.get('1.0','end')))
             except Exception as exc:messagebox.showerror('Правила',str(exc),parent=win);return
             self.invalidate();win.destroy()
-        ttk.Button(win,text='Сохранить новую версию правил',command=save).pack(pady=8)
+        ttk.Button(win,text='Сохранить новую версию правил',command=save).pack(side='bottom', pady=8)
+        text.pack(fill='both', expand=True)
 
     def save(self,zipped):
         target=filedialog.asksaveasfilename(parent=self,defaultextension='.zip',filetypes=[('ZIP','*.zip')]) if zipped else filedialog.askdirectory(parent=self)

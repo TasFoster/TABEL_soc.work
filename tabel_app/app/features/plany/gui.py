@@ -72,7 +72,7 @@ class PlanyWindow(tk.Toplevel):
         ttk.Label(self, textvariable=self.info, foreground="#555", wraplength=680,
                   justify="left").pack(fill="x", padx=10, pady=(2, 0))
         bottom = ttk.Frame(self)
-        bottom.pack(side="bottom", fill="x", **pad)
+        bottom.pack(side="bottom", fill="x", before=mid, **pad)
         self.gen_btn = ttk.Button(bottom, text="Сформировать месяц (.odt)",
                                   command=self._generate_one)
         self.gen_btn.pack(side="right")
@@ -80,7 +80,9 @@ class PlanyWindow(tk.Toplevel):
         self.gen_all_btn = ttk.Button(bottom, text="Сформировать все 12 (в папку)",
                                       command=self._generate_all)
         self.gen_all_btn.pack(side="right", padx=6)
-        feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        feedback_row = ttk.Frame(self)
+        feedback_row.pack(side="bottom", fill="x", before=mid, padx=8)
+        feedback.add_button(feedback_row, self, FEATURE_TITLE, side="left")
 
     # ---------------------------------------------------------------- данные
     def _dept(self):
@@ -170,6 +172,7 @@ class PlanyWindow(tk.Toplevel):
         win = tk.Toplevel(self)
         win.title("Редактор плана — ОСОД № " + dept)
         win.geometry("1050x720")
+        win.minsize(440, 300)
         entries = []
         from tkinter import scrolledtext
         canvas = tk.Canvas(win)
@@ -178,7 +181,8 @@ class PlanyWindow(tk.Toplevel):
         canvas.pack(fill="both", expand=True)
         canvas.configure(yscrollcommand=sb.set)
         frame = ttk.Frame(canvas)
-        canvas.create_window((0,0), window=frame, anchor="nw")
+        form_id = canvas.create_window((0, 0), window=frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(form_id, width=e.width))
         frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         def field(label, value, setter):
             ttk.Label(frame, text=label).pack(anchor="w")
@@ -195,7 +199,7 @@ class PlanyWindow(tk.Toplevel):
         people = storage.department_records().get(dept, {}).get("employees", [])
         worker = tk.StringVar(value=service.effective_worker(dept, year, month))
         ttk.Label(frame, text="Соцработник (список из табеля, можно вписать вручную)").pack(anchor="w")
-        ttk.Combobox(frame, textvariable=worker, values=[p['fio'] for p in people], width=70).pack(anchor="w")
+        ttk.Combobox(frame, textvariable=worker, values=[p['fio'] for p in people], width=40).pack(fill="x")
         for section in plan.get("sections", []):
             ttk.Label(frame, text=section.get("title", "")).pack(anchor="w")
             for row in section["rows"]:
@@ -218,7 +222,7 @@ class PlanyWindow(tk.Toplevel):
             storage.plan_save(dept, year, month, plan)
             win.destroy()
             self._reload()
-        ttk.Button(win, text="Сохранить изменения", command=save).pack(side="bottom")
+        ttk.Button(win, text="Сохранить изменения", command=save).pack(side="bottom", before=sb, pady=8)
 
     def _selected_month(self):
         sel = self.tree.selection()

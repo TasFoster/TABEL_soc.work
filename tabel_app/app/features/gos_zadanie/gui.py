@@ -48,9 +48,10 @@ class GosZadanieWindow(tk.Toplevel):
         g = ttk.Frame(fr)
         g.pack(fill="x", padx=6, pady=4)
         ttk.Label(g, text="Отчёт по количеству услуг (.xls):").grid(row=0, column=0, sticky="w")
-        ttk.Entry(g, textvariable=self.src_var, width=58).grid(row=0, column=1, padx=4)
+        ttk.Entry(g, textvariable=self.src_var).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Button(g, text="Обзор…", command=self._pick_source).grid(row=0, column=2)
         ttk.Button(g, text="Подготовить", command=self._prepare).grid(row=0, column=3, padx=6)
+        g.columnconfigure(1, weight=1)
 
         req = ttk.LabelFrame(self, text="Реквизиты (заполняются из файла, можно править)")
         req.pack(fill="x", **pad)

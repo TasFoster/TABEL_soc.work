@@ -99,8 +99,8 @@ class GrafikiWindow(tk.Toplevel):
             self._self_vars[fio] = var
             row = ttk.Frame(self._wlist)
             row.pack(fill="x", anchor="w")
-            ttk.Label(row, text=fio, width=36, anchor="w").pack(side="left", padx=(4, 6))
-            ttk.Checkbutton(row, text="самоконтроль", variable=var).pack(side="left")
+            ttk.Checkbutton(row, text="самоконтроль", variable=var).pack(side="right", padx=6)
+            ttk.Label(row, text=fio, anchor="w").pack(side="left", fill="x", expand=True, padx=4)
 
     def _generate(self):
         if not self._self_vars:

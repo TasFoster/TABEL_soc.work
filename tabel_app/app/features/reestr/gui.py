@@ -83,9 +83,10 @@ class ReestrWindow(tk.Toplevel):
 
         fr = ttk.Frame(top)
         fr.pack(fill="x", padx=6, pady=4)
+        fr.columnconfigure(1, weight=1)
         ttk.Label(fr, text="Папка с файлами:").grid(row=0, column=0, sticky="w")
         self.folder_var = tk.StringVar()
-        ttk.Entry(fr, textvariable=self.folder_var, width=58).grid(row=0, column=1, padx=4)
+        ttk.Entry(fr, textvariable=self.folder_var).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Button(fr, text="Обзор…", command=self._pick_folder).grid(row=0, column=2)
 
         labels = [("gos", "Реестр государственных:"), ("dop", "Реестр дополнительных:"),
@@ -93,7 +94,7 @@ class ReestrWindow(tk.Toplevel):
                   ("journal", "Журнал договоров (необяз.):")]
         for i, (key, text) in enumerate(labels, start=1):
             ttk.Label(fr, text=text).grid(row=i, column=0, sticky="w", pady=2)
-            ttk.Entry(fr, textvariable=self.vars[key], width=58).grid(row=i, column=1, padx=4)
+            ttk.Entry(fr, textvariable=self.vars[key]).grid(row=i, column=1, sticky="ew", padx=4)
             ttk.Button(fr, text="файл…", command=lambda k=key: self._pick_file(k)).grid(row=i, column=2)
 
         mid = ttk.Frame(self)
@@ -271,6 +272,7 @@ class AssignDialog(tk.Toplevel):
         super().__init__(master)
         self.title("Новые клиенты — назначьте соцработника")
         self.geometry("620x440")
+        self.minsize(570, 300)
         self.transient(master)
         self.grab_set()
         self.result = {}
@@ -362,6 +364,7 @@ class ClientsManager(tk.Toplevel):
         super().__init__(master)
         self.title("Клиенты и группы (соцработники)")
         self.geometry("840x560")
+        self.minsize(760, 360)
         self.transient(master)
         self.grab_set()
         self.saved = False
@@ -594,6 +597,7 @@ class PeresmotrDialog(tk.Toplevel):
         super().__init__(master)
         self.title("Пометки «пересмотр»")
         self.geometry("520x560")
+        self.minsize(480, 320)
         self.transient(master)
         self.grab_set()
         self.result = set()

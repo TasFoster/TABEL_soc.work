@@ -102,7 +102,8 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         a.pack(fill="x", padx=6, pady=4)
         ttk.Label(a, text="Соцработник:").grid(row=0, column=0, sticky="w")
         self.worker_combo = ttk.Combobox(a, textvariable=self.worker_var, state="readonly", width=40)
-        self.worker_combo.grid(row=0, column=1, sticky="w", padx=4)
+        self.worker_combo.grid(row=0, column=1, sticky="ew", padx=4)
+        a.columnconfigure(1, weight=1)
         self.worker_combo.bind("<<ComboboxSelected>>", lambda e: self._reload_clients())
         ttk.Label(a, text="Четверг:").grid(row=0, column=2, sticky="w", padx=(12, 0))
         self.thu_combo = ttk.Combobox(a, textvariable=self.thu_var, state="readonly", width=12)
@@ -112,7 +113,7 @@ class ProverkaKachestvaWindow(tk.Toplevel):
 
         cbox = ttk.LabelFrame(assign, text="Клиенты соцработника (отметьте нужных)")
         cbox.pack(fill="both", expand=True, padx=6, pady=(0, 4))
-        canvas = tk.Canvas(cbox, borderwidth=0, highlightthickness=0, height=130)
+        canvas = tk.Canvas(cbox, borderwidth=0, highlightthickness=0, height=110)
         sb = ttk.Scrollbar(cbox, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
@@ -135,14 +136,14 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         self.tree.bind("<Double-1>", self._on_double_click)
 
         tbtn = ttk.Frame(self)
-        tbtn.pack(fill="x", padx=8)
+        tbtn.pack(side="bottom", fill="x", before=prev, padx=8)
         ttk.Button(tbtn, text="Добавить пустую строку", command=self._add_empty).pack(side="left")
         ttk.Button(tbtn, text="Удалить строку", command=self._delete_row).pack(side="left", padx=6)
 
         ttk.Label(self, textvariable=self.info, foreground="#555", wraplength=900,
                   justify="left").pack(fill="x", padx=10, pady=(2, 0))
         bottom = ttk.Frame(self)
-        bottom.pack(side="bottom", fill="x", **pad)
+        bottom.pack(side="bottom", fill="x", before=tbtn, **pad)
         self.gen_btn = ttk.Button(bottom, text="Сформировать (.ods)", command=self._generate)
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)

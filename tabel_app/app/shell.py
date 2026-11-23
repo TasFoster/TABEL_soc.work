@@ -67,10 +67,10 @@ class Shell(ctk.CTk):
                 anchor="w", padx=12, pady=(8, 0))
             row = ctk.CTkFrame(card, fg_color="transparent")
             row.pack(fill="x", padx=12, pady=(0, 10))
-            ctk.CTkLabel(row, text=feat.description, wraplength=430, justify="left",
-                         text_color="gray30").pack(side="left")
             ctk.CTkButton(row, text="Открыть", width=110,
-                          command=lambda f=feat: self._open(f)).pack(side="right")
+                          command=lambda f=feat: self._open(f)).pack(side="right", padx=(10, 0))
+            ctk.CTkLabel(row, text=feat.description, wraplength=360, justify="left",
+                         text_color="gray30").pack(side="left", fill="x", expand=True)
 
         # Тихая фоновая проверка обновлений вскоре после старта (не мешает при оффлайне).
         self.after(1500, self._silent_update_check)

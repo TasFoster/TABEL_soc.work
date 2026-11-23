@@ -379,7 +379,7 @@ class PhonesManager(tk.Toplevel):
         self.tree.bind("<Double-1>", self._edit)
 
         btns = ttk.Frame(self)
-        btns.pack(fill="x", padx=12, pady=8)
+        btns.pack(side="bottom", fill="x", before=frm, padx=12, pady=8)
         ttk.Button(btns, text="Добавить", command=self._add).pack(side="left")
         ttk.Button(btns, text="Удалить", command=self._delete).pack(side="left", padx=6)
         ttk.Button(btns, text="Закрыть", command=self.destroy).pack(side="right")

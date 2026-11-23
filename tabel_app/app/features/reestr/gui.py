@@ -289,22 +289,24 @@ class AssignDialog(tk.Toplevel):
         canvas.configure(yscrollcommand=vsb.set)
         vsb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True, padx=8)
-        canvas.create_window((0, 0), window=frame, anchor="nw")
+        win = canvas.create_window((0, 0), window=frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        frame.columnconfigure(0, weight=1)
         frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
         self._vars = {}
         for i, fio in enumerate(fios):
-            ttk.Label(frame, text=fio, width=40).grid(row=i, column=0, sticky="w", pady=2)
+            ttk.Label(frame, text=fio).grid(row=i, column=0, sticky="w", pady=2)
             v = tk.StringVar()
             cb = ttk.Combobox(frame, textvariable=v, state="readonly", width=32, values=workers)
             sug = self._suggest.get(fio, "")
             if sug in workers:
                 v.set(sug)  # подсказка из колонки реестра
-            cb.grid(row=i, column=1, padx=4, pady=2)
+            cb.grid(row=i, column=1, sticky="ew", padx=4, pady=2)
             self._vars[fio] = v
 
         bar = ttk.Frame(self)
-        bar.pack(side="bottom", fill="x", pady=6)
+        bar.pack(side="bottom", fill="x", before=vsb, pady=6)
         ttk.Button(bar, text="Сохранить и продолжить", command=self._ok).pack(side="right", padx=8)
         ttk.Button(bar, text="Отмена", command=self.destroy).pack(side="right")
         ttk.Button(bar, text="Принять все подсказки", command=self._accept_all).pack(side="left", padx=8)
@@ -417,7 +419,7 @@ class ClientsManager(tk.Toplevel):
         ttk.Button(cb, text="Переназначить…", command=self._reassign_client).pack(side="left", padx=2)
 
         bottom = ttk.Frame(self)
-        bottom.pack(side="bottom", fill="x", pady=6)
+        bottom.pack(side="bottom", fill="x", before=left, pady=6)
         ttk.Button(bottom, text="Сохранить", command=self._save).pack(side="right", padx=8)
         ttk.Button(bottom, text="Закрыть без сохранения", command=self._discard).pack(side="right")
         self.count_lbl = ttk.Label(bottom, text="", foreground="#555")
@@ -622,7 +624,7 @@ class PeresmotrDialog(tk.Toplevel):
             ttk.Checkbutton(frame, text=disp, variable=v).pack(fill="x", anchor="w", padx=4)
 
         bar = ttk.Frame(self)
-        bar.pack(side="bottom", fill="x", pady=6)
+        bar.pack(side="bottom", fill="x", before=vsb, pady=6)
         ttk.Button(bar, text="ОК", command=self._ok).pack(side="right", padx=8)
         ttk.Button(bar, text="Отмена", command=self.destroy).pack(side="right")
 

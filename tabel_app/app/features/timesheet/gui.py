@@ -503,7 +503,7 @@ class DepartmentManager(tk.Toplevel):
         ttk.Button(ebtn, text="↓", width=3, command=lambda: self._move_emp(1)).pack(side="left", padx=2)
 
         bottom = ttk.Frame(self)
-        bottom.pack(side="bottom", fill="x", pady=6)
+        bottom.pack(side="bottom", fill="x", before=left, pady=6)
         ttk.Button(bottom, text="Сохранить", command=self._save).pack(side="right", padx=8)
         ttk.Button(bottom, text="Закрыть без сохранения", command=self._discard).pack(side="right")
         ttk.Label(bottom, text="После изменений нажмите «Сохранить».",
@@ -817,24 +817,28 @@ class CalendarDialog(tk.Toplevel):
         self.year_combo.bind("<<ComboboxSelected>>", lambda e: self._load_year())
         ttk.Button(top, text="Добавить год", command=self._add_year).pack(side="left", padx=6)
 
-        info = ("Формат: даты через запятую как ДД.ММ. Праздничные/перенесённые нерабочие дни — "
-                "это дни, помеченные «В» (кроме обычных сб/вс). Сокращённые — рабочие дни на 1 час короче. "
-                "Перенесённые рабочие дни — рабочая суббота/среда по переносу (для «Проезда» именно так "
-                "среда становится рабочей).")
-        ttk.Label(self, text=info, wraplength=520, foreground="#444").pack(fill="x", padx=8)
+        ttk.Label(self, text="Введите даты через запятую в формате ДД.ММ.",
+                  foreground="#444").pack(fill="x", padx=8)
 
-        ttk.Label(self, text="Нерабочие праздничные и перенесённые дни:").pack(anchor="w", padx=8, pady=(8, 0))
-        self.hol_text = tk.Text(self, height=6, width=64)
-        self.hol_text.pack(fill="x", padx=8)
-        ttk.Label(self, text="Сокращённые предпраздничные дни (−1 час):").pack(anchor="w", padx=8, pady=(8, 0))
-        self.short_text = tk.Text(self, height=3, width=64)
-        self.short_text.pack(fill="x", padx=8)
-        ttk.Label(self, text="Перенесённые РАБОЧИЕ дни (рабочая суббота/среда):").pack(anchor="w", padx=8, pady=(8, 0))
-        self.work_text = tk.Text(self, height=3, width=64)
-        self.work_text.pack(fill="x", padx=8)
+        form = ttk.Frame(self)
+        form.pack(fill="both", expand=True, padx=8)
+        form.columnconfigure(0, weight=1)
+        self.hol_text = tk.Text(form, height=4, width=56, wrap="word")
+        self.short_text = tk.Text(form, height=2, width=56, wrap="word")
+        self.work_text = tk.Text(form, height=2, width=56, wrap="word")
+        fields = (
+            ("Нерабочие праздничные и перенесённые дни:", self.hol_text),
+            ("Сокращённые предпраздничные дни (−1 час):", self.short_text),
+            ("Перенесённые рабочие дни (рабочая суббота/среда):", self.work_text),
+        )
+        for index, (label, field) in enumerate(fields):
+            row = index * 2
+            ttk.Label(form, text=label).grid(row=row, sticky="w", pady=(8, 0))
+            field.grid(row=row + 1, sticky="nsew")
+            form.rowconfigure(row + 1, weight=1)
 
         bar = ttk.Frame(self)
-        bar.pack(side="bottom", fill="x", pady=8)
+        bar.pack(side="bottom", fill="x", before=form, pady=8)
         ttk.Button(bar, text="Сохранить", command=self._save).pack(side="right", padx=8)
         ttk.Button(bar, text="Закрыть", command=self.destroy).pack(side="right")
 

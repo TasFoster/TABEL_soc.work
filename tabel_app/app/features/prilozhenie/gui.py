@@ -421,11 +421,11 @@ class PeriodsEditor(tk.Toplevel):
         self._refresh()
 
         bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=10)
+        bar.pack(side="bottom", fill="x", before=self.tree, padx=10)
         ttk.Button(bar, text="Добавить", command=self._add).pack(side="left")
         ttk.Button(bar, text="Удалить", command=self._del).pack(side="left", padx=4)
         bar2 = ttk.Frame(self)
-        bar2.pack(fill="x", padx=10, pady=8)
+        bar2.pack(side="bottom", fill="x", before=bar, padx=10, pady=8)
         ttk.Button(bar2, text="Сохранить", command=self._save).pack(side="right")
         ttk.Button(bar2, text="Отмена", command=self.destroy).pack(side="right", padx=6)
 
@@ -575,12 +575,12 @@ class RedistributionDialog(tk.Toplevel):
         self._refresh()
 
         bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=10)
+        bar.pack(side="bottom", fill="x", before=self.tree, padx=10)
         ttk.Button(bar, text="Авто-черновик по отсутствиям", command=self._auto).pack(side="left")
         ttk.Button(bar, text="Добавить вручную", command=self._add).pack(side="left", padx=4)
         ttk.Button(bar, text="Удалить", command=self._del).pack(side="left")
         bar2 = ttk.Frame(self)
-        bar2.pack(fill="x", padx=10, pady=8)
+        bar2.pack(side="bottom", fill="x", before=bar, padx=10, pady=8)
         ttk.Button(bar2, text="Сохранить", command=self._save).pack(side="right")
         ttk.Button(bar2, text="Отмена", command=self.destroy).pack(side="right", padx=6)
 

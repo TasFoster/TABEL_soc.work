@@ -115,6 +115,15 @@ def save_act(folder, client, extension, content):
 
 
 
+def act_recipient(text):
+    if not re.search(r"Акт\s+сдачи\s*[-–—‑]\s*при[её]мки", text, re.I):
+        raise ValueError("Не найден заголовок акта сдачи-приёмки.")
+    client = recipient(text)
+    if not client:
+        raise ValueError("Акт распознан. Проверьте ФИО в поле получателя услуг или заказчика.")
+    return client
+
+
 def prepare(source, folder, month, signed, worker, director):
     try:
         return prepare_docx(source, folder, month, signed, worker, director)
@@ -123,9 +132,7 @@ def prepare(source, folder, month, signed, worker, director):
             raise
     raw = source.read_bytes()
     text, spans = rtf.parse(raw)
-    client = recipient(text)
-    if not client or not re.search(r"Акт\s+сдачи[-–‑]при[её]мки", text, re.I):
-        raise ValueError("Не распознан акт или ФИО заказчика.")
+    client = act_recipient(text)
     for pattern, value in field_rules(month, signed, worker, director):
         matches = list(re.finditer(pattern, text, re.I | re.M))
         if not matches:
@@ -144,9 +151,7 @@ def prepare_docx(source, folder, month, signed, worker, director):
         doc = Document(path)
         paragraphs = [Paragraph(node, doc) for node in doc.element.body.xpath(".//w:p")]
         text = "\n".join(p.text for p in paragraphs)
-        client = recipient(text)
-        if not client or not re.search(r"Акт\s+сдачи[-–‑]при[её]мки", text, re.I):
-            raise ValueError("Не распознан акт или ФИО заказчика.")
+        client = act_recipient(text)
         rules = field_rules(month, signed, worker, director)
         for pattern, value in rules:
             hits = 0

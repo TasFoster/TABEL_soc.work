@@ -10,12 +10,14 @@ def load_rules():
     if path.exists():
         # Новые типы доступны после обновления, прежние пользовательские правки сохраняются.
         custom = json.loads(path.read_text(encoding='utf-8'))
-        # Добавляем новые исходные варианты к прежнему стандартному правилу акта,
-        # сохраняя отредактированное пользователем целевое ФИО.
-        if custom.get('additional_act') and defaults.get('additional_act'):
-            rule = custom['additional_act'][0]
-            if rule.get('before') == defaults['additional_act'][0]['before']:
-                rule.setdefault('before_variants', defaults['additional_act'][0].get('before_variants', []))
+        for kind in ('additional_act', 'additional'):
+            for rule in custom.get(kind, []):
+                standard = defaults[kind][0]
+                if rule.get('before') == standard['before']:
+                    variants = rule.setdefault('before_variants', [])
+                    for variant in standard.get('before_variants', []):
+                        if variant not in variants:
+                            variants.append(variant)
         defaults.update(custom)
     return defaults
 

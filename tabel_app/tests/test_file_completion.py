@@ -29,6 +29,16 @@ class CompletionTests(unittest.TestCase):
                 if other!=kind:
                     with self.assertRaises(ValueError):service.transform(raw,other,RULES)
 
+    def test_additional_contract_blank_payment_template(self):
+        rule = RULES['additional'][0]
+        raw = document('additional')
+        match, = service.locate(rtf.parse(raw)[0], rule['before'])
+        draft = rtf.replace(raw, *match.span(), rule['before_variants'][0])
+        result, _, diff = service.transform(draft, 'additional', RULES)
+        self.assertTrue(diff)
+        self.assertEqual(rtf.parse(result)[0], rtf.parse(raw)[0].replace(rule['before'], rule['after']))
+        self.assertEqual(service.transform(result, 'additional', RULES)[2], '')
+
     def test_partial_unknown_and_malformed(self):
         raw=document('free');text,_=rtf.parse(raw)
         rule=RULES['free'][0];m=service.locate(text,rule['before'])[0]

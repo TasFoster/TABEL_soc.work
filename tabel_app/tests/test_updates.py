@@ -109,9 +109,9 @@ class UpdatesTest(unittest.TestCase):
         with patch.object(storage.sys, "platform", "linux"), patch.object(storage.sys, "frozen", True, create=True):
             for package in ("tabel", "tabel-lite"):
                 with patch.object(storage.sys, "executable", f"/usr/lib/{package}/{package}"):
-                    with patch.dict(os.environ, {"XDG_DATA_HOME": str(root), "HOME": str(root)}):
+                    with patch.dict(os.environ, {"XDG_DATA_HOME": str(root), "HOME": str(root), "USERPROFILE": str(root)}):
                         self.assertEqual(storage.app_base_dir(), str(root / package))
-                    with patch.dict(os.environ, {"XDG_DATA_HOME": "relative", "HOME": str(root)}):
+                    with patch.dict(os.environ, {"XDG_DATA_HOME": "relative", "HOME": str(root), "USERPROFILE": str(root)}):
                         self.assertEqual(storage.app_base_dir(), str(root / ".local" / "share" / package))
 
 

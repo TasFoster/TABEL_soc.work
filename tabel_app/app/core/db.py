@@ -781,65 +781,65 @@ def reestr_set_kv(conn, key, obj):
 # ============================================ публичный API для функций (своё conn)
 def departments_load():
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         return _departments_to_dict(conn)
 
 
 def departments_save(data):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         replace_departments(conn, data.get("departments", []))
         conn.commit()
 
 
 def settings_load():
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         return read_settings(conn)
 
 
 def settings_save(data):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         write_settings(conn, data)
         conn.commit()
 
 
 def calendar_load():
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         return read_calendar(conn)
 
 
 def calendar_save(data):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         write_calendar(conn, data)
         conn.commit()
 
 
 def reestr_map_load():
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         return reestr_load_map(conn)
 
 
 def reestr_map_save(obj):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         reestr_save_map(conn, obj)
         conn.commit()
 
 
 def reestr_kv_load(key, default=None):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         return reestr_get_kv(conn, key, default)
 
 
 def reestr_kv_save(key, obj):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         reestr_set_kv(conn, key, obj)
         conn.commit()
 
@@ -847,7 +847,7 @@ def reestr_kv_save(key, obj):
 def employee_worker_fios():
     """ФИО соцработников из единой базы (для списков выбора в «Реестре»)."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         rows = conn.execute(
             "SELECT fio, position FROM employees ORDER BY sort_order, n, id").fetchall()
     return [r["fio"] for r in rows if "работник" in (r["position"] or "").lower()]
@@ -862,7 +862,7 @@ def _pk_key(fio):
 
 def pk_phone_load(client_fio):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         r = conn.execute("SELECT phone FROM pk_phones WHERE client_fio=?",
                          (_pk_key(client_fio),)).fetchone()
     return r["phone"] if r and r["phone"] else ""
@@ -873,7 +873,7 @@ def pk_phone_save(client_fio, phone):
     if not key:
         return
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO pk_phones(client_fio, phone) VALUES(?,?) "
             "ON CONFLICT(client_fio) DO UPDATE SET phone=excluded.phone",
@@ -883,14 +883,14 @@ def pk_phone_save(client_fio, phone):
 
 def pk_phones_load_all():
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         rows = conn.execute("SELECT client_fio, phone FROM pk_phones ORDER BY client_fio").fetchall()
     return {r["client_fio"]: r["phone"] for r in rows}
 
 
 def pk_phone_delete(client_fio):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         conn.execute("DELETE FROM pk_phones WHERE client_fio=?", (_pk_key(client_fio),))
         conn.commit()
 
@@ -899,7 +899,7 @@ def pk_phone_delete(client_fio):
 def plany_worker_load(dept, year, month):
     """Сохранённый соцработник для (отд, год, месяц) или '' если не задан."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         r = conn.execute(
             "SELECT worker FROM plany_workers WHERE dept=? AND year=? AND month=?",
             (str(dept), int(year), int(month))).fetchone()
@@ -908,7 +908,7 @@ def plany_worker_load(dept, year, month):
 
 def plany_worker_save(dept, year, month, worker):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO plany_workers(dept, year, month, worker) VALUES(?,?,?,?) "
             "ON CONFLICT(dept, year, month) DO UPDATE SET worker=excluded.worker",
@@ -919,7 +919,7 @@ def plany_worker_save(dept, year, month, worker):
 def plany_workers_load_all(dept, year):
     """Все заданные соцработники за год как {месяц: соцработник}."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         rows = conn.execute(
             "SELECT month, worker FROM plany_workers WHERE dept=? AND year=?",
             (str(dept), int(year))).fetchall()
@@ -930,7 +930,7 @@ def plany_workers_load_all(dept, year):
 def documents_add(feature, title, filename, params, content):
     """Сохранить сформированный документ (копию файла + параметры) в базу."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         conn.execute(
             "INSERT INTO documents(feature,title,filename,created_at,params,content) "
             "VALUES(?,?,?,?,?,?)",
@@ -953,7 +953,7 @@ def documents_last_params(feature):
 def documents_list():
     """Список документов (без содержимого), новые сверху."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         rows = conn.execute(
             "SELECT id, feature, title, filename, created_at, params, length(content) AS size "
             "FROM documents ORDER BY created_at DESC, id DESC").fetchall()
@@ -963,7 +963,7 @@ def documents_list():
 def documents_get(doc_id):
     """(filename, content_bytes) по id или (None, None)."""
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         r = conn.execute(
             "SELECT filename, content FROM documents WHERE id=?", (doc_id,)).fetchone()
     return (r["filename"], r["content"]) if r else (None, None)
@@ -971,6 +971,6 @@ def documents_get(doc_id):
 
 def documents_delete(doc_id):
     ensure_seeded()
-    with get_conn() as conn:
+    with closing(get_conn()) as conn, conn:
         conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
         conn.commit()

@@ -1,4 +1,4 @@
-name: Windows installers
+name: Windows and Ubuntu installers
 
 on:
   push:
@@ -9,15 +9,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: windows-release
+  group: tabel-release
   cancel-in-progress: false
 
 jobs:
-  release:
+  version:
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    outputs:
+      number: ${{ steps.version.outputs.number }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version and prevent replacing a published release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(<tabel_app/VERSION)
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          existing=$(gh release list --limit 100 --json tagName,isDraft --jq "any(.[]; .tagName == \"$tag\" and (.isDraft | not))")
+          if [[ $existing == true ]]; then
+            echo 'Version already published. Increase VERSION.' >&2
+            exit 1
+          fi
+          echo "number=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
     runs-on: windows-2022
     timeout-minutes: 45
     defaults:
@@ -25,8 +49,6 @@ jobs:
         shell: pwsh
     env:
       PYTHONUTF8: "1"
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,16 +56,6 @@ jobs:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: tabel_app/requirements*.txt
-      - name: Validate version and prevent replacing a published release
-        id: version
-        run: |
-          $version = (Get-Content tabel_app/VERSION -Raw).Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid VERSION' }
-          "tag=v$version" >> $env:GITHUB_OUTPUT
-          $existing = gh release list --limit 100 --json tagName,isDraft | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot list releases' }
-          $release = $existing | Where-Object tagName -eq "v$version"
-          if ($release -and -not $release.isDraft) { throw 'Version already published. Increase VERSION.' }
       - name: Install dependencies
         run: |
           python -m pip install -r tabel_app/requirements-build.txt
@@ -60,36 +72,116 @@ jobs:
             choco install innosetup --yes --no-progress
             if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
           }
-      - name: Build installers and version.json
+      - name: Build installers
         run: |
           & ./tabel_app/tools/build_release.ps1 -OutDir "$env:RUNNER_TEMP/tabel-release" -Repository $env:GITHUB_REPOSITORY
-      - name: Keep build artifacts
+      - name: Keep Windows installers
         uses: actions/upload-artifact@v4
         with:
-          name: installers-${{ steps.version.outputs.tag }}
+          name: windows-installers
           if-no-files-found: error
-          path: |
-            ${{ runner.temp }}/tabel-release/*setup.exe
-            ${{ runner.temp }}/tabel-release/version.json
-      - name: Publish complete release
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          compression-level: 0
+          path: ${{ runner.temp }}/tabel-release/*setup.exe
+
+  ubuntu:
+    needs: version
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tabel_app/requirements*.txt
+      - name: Install build dependencies
         run: |
-          $tag = $env:RELEASE_TAG
-          $existing = gh release list --limit 100 --json tagName,isDraft | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot list releases' }
-          $release = $existing | Where-Object tagName -eq $tag
-          if ($release -and -not $release.isDraft) { throw 'Release already published' }
-          if (-not $release) {
-            gh release create $tag --draft --target $env:GITHUB_SHA --title "Tabel $tag" --notes-file tabel_app/RELEASE_NOTES.md
-            if ($LASTEXITCODE -ne 0) { throw 'Cannot create draft release' }
-          }
+          sudo apt-get update
+          sudo apt-get install -y binutils libx11-6 libxext6 libxft2 libxrender1 libfontconfig1
+          python -m pip install -r tabel_app/requirements-build.txt
+          python -c "import tkinter, customtkinter, cv2"
+      - name: Unit tests
+        run: python -m unittest discover -s tabel_app/tests -v
+      - name: Build Ubuntu amd64 packages
+        run: tabel_app/tools/build_deb.sh "$RUNNER_TEMP/tabel-release"
+      - name: Keep Ubuntu packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-installers
+          if-no-files-found: error
+          compression-level: 0
+          path: ${{ runner.temp }}/tabel-release/*.deb
+
+  ubuntu-smoke:
+    needs: ubuntu
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-installers
+          path: installers
+      - name: Install desktop test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth desktop-file-utils
+      - name: Install, open and upgrade both variants
+        run: tabel_app/tools/smoke_deb.sh installers
+
+  publish:
+    needs: [version, windows, ubuntu-smoke]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.version.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.version.outputs.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-installers'
+          merge-multiple: true
+          path: installers
+      - name: Prepare one manifest and the Yandex archive
+        run: |
+          windows_full=installers/Tabel-full-setup.exe
+          windows_lite=installers/Tabel-lite-setup.exe
+          ubuntu_full="installers/tabel_${RELEASE_VERSION}_amd64.deb"
+          ubuntu_lite="installers/tabel-lite_${RELEASE_VERSION}_amd64.deb"
+          python3 tabel_app/tools/make_manifest.py --version "$RELEASE_VERSION" --repository "$GH_REPO" \
+            --full "$windows_full" --lite "$windows_lite" \
+            --linux-full "$ubuntu_full" --linux-lite "$ubuntu_lite" \
+            --out installers/version.json --notes-file tabel_app/RELEASE_NOTES.md
+          zip -0 -j installers/Tabel-Yandex.zip "$windows_full" "$windows_lite" \
+            "$ubuntu_full" "$ubuntu_lite" installers/version.json
+      - name: Keep the complete release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ needs.version.outputs.tag }}
+          if-no-files-found: error
+          compression-level: 0
+          path: installers/*
+      - name: Publish complete release
+        run: |
+          existing=$(gh release list --limit 100 --json tagName,isDraft --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isDraft")
+          if [[ $existing == false ]]; then
+            echo 'Release already published' >&2
+            exit 1
+          fi
+          if [[ -z $existing ]]; then
+            gh release create "$RELEASE_TAG" --draft --target "$GITHUB_SHA" \
+              --title "Tabel $RELEASE_TAG" --notes-file tabel_app/RELEASE_NOTES.md
+          fi
           # A failed run may leave a draft. Never reuse a draft for another commit.
-          $target = gh release view $tag --json targetCommitish --jq .targetCommitish
-          if ($LASTEXITCODE -ne 0 -or $target -ne $env:GITHUB_SHA) { throw 'Draft tag does not match this build' }
-          $out = "$env:RUNNER_TEMP/tabel-release"
-          Compress-Archive -LiteralPath "$out/Tabel-full-setup.exe","$out/Tabel-lite-setup.exe","$out/version.json" -DestinationPath "$out/Tabel-Yandex.zip"
-          gh release upload $tag "$out/Tabel-full-setup.exe" "$out/Tabel-lite-setup.exe" "$out/version.json" "$out/Tabel-Yandex.zip" --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'Upload failed; release remains draft' }
-          gh release edit $tag --draft=false --latest
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot publish release' }
+          [[ $(gh release view "$RELEASE_TAG" --json targetCommitish --jq .targetCommitish) == "$GITHUB_SHA" ]]
+          gh release upload "$RELEASE_TAG" installers/*.exe installers/*.deb installers/version.json \
+            installers/Tabel-Yandex.zip --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

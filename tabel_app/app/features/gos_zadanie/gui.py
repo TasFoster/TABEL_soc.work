@@ -5,6 +5,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import DEFAULT_ZAV, MONTHS
 from ...core import checklist_gui, documents, feedback, ui_state
@@ -156,7 +157,7 @@ class GosZadanieWindow(tk.Toplevel):
         self.info.set(f"Готово: {out}")
         if messagebox.askyesno("Готово", f"Файл сохранён:\n{out}\n\nОткрыть?"):
             try:
-                os.startfile(out)
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 

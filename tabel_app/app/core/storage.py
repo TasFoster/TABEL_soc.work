@@ -5,7 +5,7 @@
     <ресурсы>/features/<feature>/data/...      — значения по умолчанию (зашиты в .exe)
     <ресурсы>/features/<feature>/templates/... — шаблоны только для чтения
 
-Работает и из исходников, и из собранного .exe (PyInstaller).
+Установленный пакет для Linux хранит пользовательские данные в XDG_DATA_HOME.
 """
 
 import json
@@ -19,8 +19,14 @@ def _is_frozen():
 
 
 def app_base_dir():
-    """Папка рядом с программой (для пользовательских данных)."""
+    """Базовая папка пользовательских данных."""
     if _is_frozen():
+        if sys.platform == "linux":
+            xdg_data = os.environ.get("XDG_DATA_HOME", "")
+            if not os.path.isabs(xdg_data):
+                xdg_data = os.path.join(os.path.expanduser("~"), ".local", "share")
+            package = "tabel-lite" if os.path.basename(sys.executable) == "tabel-lite" else "tabel"
+            return os.path.join(xdg_data, package)
         return os.path.dirname(os.path.abspath(sys.executable))
     # app/core/storage.py -> core -> app -> tabel_app
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

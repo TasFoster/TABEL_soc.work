@@ -4,6 +4,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_TITLE, parser, service, storage
 from ...core import documents, feedback, ui_state
 
@@ -260,7 +261,7 @@ class ReestrWindow(tk.Toplevel):
         self.gen_btn.config(state="normal")
         if messagebox.askyesno("Готово", f"РЕЕСТР сохранён:\n{out}\n\nОткрыть файл?"):
             try:
-                os.startfile(out)
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 

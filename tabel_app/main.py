@@ -338,9 +338,11 @@ def _selftest_ocr():
 
 
 def _selftest_release():
-    """Проверка зависимостей собранного EXE без открытия окон и работы с БД."""
+    """Проверка сборки и, с --selftest-desktop на Linux, окна и базы."""
     import json
     import traceback
+    from app.core import storage
+
     result = {"ok": False}
     try:
         from app import shell
@@ -359,8 +361,18 @@ def _selftest_release():
             from app.features.proezd import parser
             if not parser.ocr_available():
                 raise RuntimeError("OCR dependencies missing in full build")
-            from winrt.windows.graphics.imaging import BitmapDecoder
-            from winrt.windows.storage import StorageFile
+            if sys.platform == "linux":
+                import cv2
+                import numpy as np
+
+                image = np.full((100, 500), 255, dtype=np.uint8)
+                cv2.putText(image, "123456", (20, 72), cv2.FONT_HERSHEY_SIMPLEX, 2, 0, 3)
+                ok, png = cv2.imencode(".png", image)
+                if not ok or "123456" not in parser._tesseract_read(parser._tesseract(), png.tobytes()):
+                    raise RuntimeError("Tesseract did not recognise the smoke image")
+            else:
+                from winrt.windows.graphics.imaging import BitmapDecoder
+                from winrt.windows.storage import StorageFile
         # Проверяем новый ресурс и генерацию в обеих frozen-сборках, без БД.
         import tempfile
         import xlrd
@@ -404,10 +416,23 @@ def _selftest_release():
                 line in paragraphs for line in (*draft["planned_report"].splitlines(), "Test discussion")
             ):
                 raise RuntimeError("Protocol plan or document is missing")
+        if "--selftest-desktop" in sys.argv:
+            from app.core import db
+
+            db.ensure_seeded()
+            window = shell.Shell()
+            try:
+                window.update_idletasks()
+                if not window.winfo_viewable():
+                    raise RuntimeError("The launcher is not visible")
+            finally:
+                window.destroy()
         result = {"ok": True, "version": version.APP_VERSION, "variant": variant, "features": keys}
     except Exception:
         result["error"] = traceback.format_exc()
-    with open(os.path.join(_base_dir(), "selftest_release_result.json"), "w", encoding="utf-8") as stream:
+    base = storage.app_base_dir()
+    os.makedirs(base, exist_ok=True)
+    with open(os.path.join(base, "selftest_release_result.json"), "w", encoding="utf-8") as stream:
         json.dump(result, stream, ensure_ascii=False, indent=2)
 
 

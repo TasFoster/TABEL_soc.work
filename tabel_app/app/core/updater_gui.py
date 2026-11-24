@@ -5,9 +5,11 @@
 """
 
 import os
+import shlex
+import sys
 import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from . import ui_state, updater
 
@@ -86,7 +88,9 @@ class UpdateDialog(tk.Toplevel):
 
         bar = ttk.Frame(self)
         bar.pack(side="bottom", fill="x", before=box, **pad)
-        if self.kind == "installed":
+        if sys.platform == "linux":
+            self.ok = ttk.Button(bar, text="Скачать пакет .deb", command=self._download_deb)
+        elif self.kind == "installed":
             self.ok = ttk.Button(bar, text="Обновить сейчас", command=self._update_installed)
         else:
             self.ok = ttk.Button(bar, text="Скачать установщик", command=self._download_portable)
@@ -97,6 +101,8 @@ class UpdateDialog(tk.Toplevel):
         if self.kind == "source":
             self.status.set("Запуск из исходников — обновление не требуется.")
             self.ok.config(state="disabled")
+        elif sys.platform == "linux":
+            self.status.set("Установите скачанный пакет через менеджер пакетов Ubuntu.")
         elif self.kind == "portable":
             self.status.set("Портативная копия: установщик будет скачан в «Загрузки».")
 
@@ -136,6 +142,24 @@ class UpdateDialog(tk.Toplevel):
         messagebox.showinfo(
             "Установщик скачан",
             f"Установщик сохранён:\n{path}\n\nЗакройте программу и запустите его для обновления.")
+        self.destroy()
+
+    def _download_deb(self):
+        path = filedialog.asksaveasfilename(
+            parent=self, title="Сохранить пакет обновления", defaultextension=".deb",
+            initialfile=os.path.basename(updater.temp_installer_path(self.info["version"])),
+            filetypes=[("Пакет Ubuntu", "*.deb")],
+        )
+        if path:
+            self._start_download(self._after_deb, dest=path)
+
+    def _after_deb(self, path):
+        messagebox.showinfo(
+            "Пакет скачан",
+            f"Пакет сохранён:\n{path}\n\nЗакройте программу и откройте пакет в менеджере пакетов "
+            f"или выполните в терминале:\nsudo apt install {shlex.quote(os.path.abspath(path))}",
+            parent=self,
+        )
         self.destroy()
 
     # ---- общая загрузка с прогрессом (в фоновом потоке) ----

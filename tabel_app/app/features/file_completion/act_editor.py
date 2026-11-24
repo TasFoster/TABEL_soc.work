@@ -11,6 +11,7 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Mm
 from pypdf import PdfReader
+from ...core.desktop import system_process_env
 from ..timesheet.calendar_ru import MONTHS_NOM
 from .names import recipient
 from . import rtf
@@ -49,7 +50,7 @@ def convert(source, folder, extension):
     if office:
         cmd = [office, "-env:UserInstallation=" + (folder / "profile").as_uri(),
                "--headless", "--convert-to", extension, "--outdir", str(folder), str(source)]
-        env = None
+        env = system_process_env()
     elif os.name == "nt":
         env = dict(os.environ, ACT_SOURCE=str(source), ACT_TARGET=str(target),
                    ACT_FORMAT="17" if extension == "pdf" else "16")

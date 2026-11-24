@@ -10,6 +10,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import DEFAULTS, MONTHS_NOM
 from .writer import COLS
@@ -343,7 +344,7 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         self.info.set(f"Готово: {out}")
         if messagebox.askyesno("Готово", f"Файл сохранён:\n{out}\n\nОткрыть?"):
             try:
-                os.startfile(out)
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 

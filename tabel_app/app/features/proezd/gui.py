@@ -8,6 +8,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from ...core import checklist_gui, documents, feedback, ui_state
 
@@ -175,7 +176,7 @@ class ProezdWindow(tk.Toplevel):
         scan = self.scan_var.get().strip()
         if scan and os.path.exists(scan):
             try:
-                os.startfile(scan)
+                open_path(scan)
             except Exception:  # noqa: BLE001
                 pass
         else:
@@ -456,7 +457,7 @@ class ProezdWindow(tk.Toplevel):
         self.gen_btn.config(state="normal")
         if messagebox.askyesno("Готово", f"Файл сохранён:\n{out}\n\nОткрыть?"):
             try:
-                os.startfile(out)
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 

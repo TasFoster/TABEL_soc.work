@@ -11,6 +11,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import MONTHS_NOM
 from ...core import checklist_gui, documents, feedback, ui_state
@@ -259,7 +260,7 @@ class PlanyWindow(tk.Toplevel):
         self.info.set("Готово: %s" % out)
         if messagebox.askyesno("Готово", "Файл сохранён:\n%s\n\nОткрыть?" % out):
             try:
-                os.startfile(out)
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -293,7 +294,7 @@ class PlanyWindow(tk.Toplevel):
         messagebox.showinfo("Готово", msg)
         if ok and messagebox.askyesno("Открыть папку", "Открыть папку с планами?"):
             try:
-                os.startfile(folder)
+                open_path(folder)
             except Exception:  # noqa: BLE001
                 pass
 

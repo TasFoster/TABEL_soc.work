@@ -7,6 +7,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from .desktop import open_path
 from . import documents, feedback
 from .documents import FEATURE_TITLES
 
@@ -131,7 +132,7 @@ class DocumentsWindow(tk.Toplevel):
         path = documents.extract_to_temp(doc_id)
         if path:
             try:
-                os.startfile(path)
+                open_path(path)
             except Exception:  # noqa: BLE001
                 messagebox.showinfo("Файл", path)
 

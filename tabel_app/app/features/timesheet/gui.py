@@ -6,6 +6,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from ...core.desktop import open_path
 from . import FEATURE_KEY, FEATURE_TITLE, storage
 from ...core import checklist_gui, documents, feedback, ui_state
 from .calendar_ru import MONTHS_NOM, month_title
@@ -381,7 +382,7 @@ class TimesheetWindow(tk.Toplevel):
         self.gen_btn.config(state="normal")
         if messagebox.askyesno("Готово", f"Табель сохранён:\n{out}\n\nОткрыть файл?"):
             try:
-                os.startfile(out)  # noqa: незадокументированный для не-Windows
+                open_path(out)
             except Exception:  # noqa: BLE001
                 pass
 

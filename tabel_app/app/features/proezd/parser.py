@@ -1,17 +1,21 @@
 """Чтение поездок из файла соцработника и (best-effort) распознавание билетов.
 
 * read_trips(.ods) — берёт поездки (дата/откуда/куда/цель) из файла вида образца.
-* ocr_tickets(.jpg) — пытается распознать билеты со скана (Windows OCR, офлайн).
+* ocr_tickets(.jpg) — пытается распознать билеты со скана (офлайн).
   Распознавание этих цветных/повёрнутых билетов НЕнадёжно, поэтому результат —
   лишь предзаполнение: номер/серию/цену пользователь сверяет и правит вручную.
 """
 
 import re
+import shutil
+import subprocess
+import sys
 
 from odf.opendocument import load
 from odf.style import Style, TableCellProperties
 from odf.table import Table
 
+from ...core.desktop import system_process_env
 from ..reestr import ods_build as ob
 
 
@@ -115,10 +119,23 @@ _SERIES_RE = re.compile(r"(\d?\s*[А-ЯA-Zа-я]{1,3}\s*[-–—]\s*\d{3})")
 _NUM_RE = re.compile(r"\d{5,7}")
 
 
+def _tesseract():
+    executable = shutil.which("tesseract")
+    if not executable:
+        return None
+    languages = subprocess.run(
+        [executable, "--list-langs"], capture_output=True, text=True,
+        check=True, timeout=5, env=system_process_env(),
+    ).stdout.splitlines()
+    return executable if {"rus", "eng"}.issubset(languages) else None
+
+
 def ocr_available():
     try:
-        import winrt.windows.media.ocr  # noqa: F401
         import cv2  # noqa: F401
+        if sys.platform == "linux":
+            return _tesseract() is not None
+        import winrt.windows.media.ocr  # noqa: F401
         return True
     except Exception:
         return False
@@ -152,54 +169,85 @@ def _parse_ticket(text):
     return number, series, kw
 
 
-def _ocr_tickets_impl(image_path):
+def _tesseract_read(executable, png):
+    return subprocess.run(
+        [executable, "stdin", "stdout", "-l", "rus+eng", "--psm", "6"],
+        input=png, capture_output=True, check=True, timeout=10,
+        env=system_process_env(),
+    ).stdout.decode("utf-8")
+
+
+def _windows_reader(directory):
     import asyncio
     import os
-    import tempfile
 
-    import cv2
-    import numpy as np
     from winrt.windows.graphics.imaging import BitmapDecoder
     from winrt.windows.media.ocr import OcrEngine
     from winrt.windows.storage import FileAccessMode, StorageFile
 
     eng = OcrEngine.try_create_from_user_profile_languages()
     if eng is None:
-        return []
+        return None
+    path = os.path.join(directory, "ticket.png")
 
-    img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-    if img is None:
-        return []
-    boxes = _segment_tickets(img, cv2, np)
-    tmp = os.path.join(tempfile.gettempdir(), "_proezd_ocr.png")
-
-    async def ocr_png(path):
+    async def recognise():
         f = await StorageFile.get_file_from_path_async(path)
         s = await f.open_async(FileAccessMode.READ)
         dec = await BitmapDecoder.create_async(s)
         bmp = await dec.get_software_bitmap_async()
         return (await eng.recognize_async(bmp)).text
 
+    def read(png):
+        with open(path, "wb") as f:
+            f.write(png)
+        return asyncio.run(recognise())
+
+    return read
+
+
+def _ocr_tickets_impl(image_path):
+    import tempfile
+
+    import cv2
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(prefix="tabel-ocr-") as directory:
+        if sys.platform == "linux":
+            executable = _tesseract()
+            if not executable:
+                return []
+            def read(png):
+                return _tesseract_read(executable, png)
+        else:
+            read = _windows_reader(directory)
+            if read is None:
+                return []
+        img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            return []
+        return _read_ticket_crops(img, cv2, np, read)
+
+
+def _read_ticket_crops(img, cv2, np, read):
     out = []
-    for (x, y, w, h) in boxes:
+    for (x, y, w, h) in _segment_tickets(img, cv2, np):
         crop = img[y:y + h, x:x + w]
-        best = ("", "", -1)
+        best = ("", "")
+        best_score = -1
         rotations = [None, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE]
         for code in rotations:
             c = crop if code is None else cv2.rotate(crop, code)
             big = cv2.resize(c, (c.shape[1] * 2, c.shape[0] * 2))
-            cv2.imwrite(tmp, _binarize(big, cv2, np))
-            num, ser, kw = _parse_ticket(asyncio.run(ocr_png(tmp)))
+            ok, png = cv2.imencode(".png", _binarize(big, cv2, np))
+            if not ok:
+                continue
+            num, ser, kw = _parse_ticket(read(png.tobytes()))
             score = kw + (2 if ser else 0) + (1 if num else 0)
-            cur = best[2] + (2 if best[1] else 0) + (1 if best[0] else 0)
-            if score > cur:
-                best = (num, ser, score)
-        if best[1] or best[0]:
-            out.append((best[0], best[1]))
-    try:
-        os.remove(tmp)
-    except OSError:
-        pass
+            if score > best_score:
+                best = (num, ser)
+                best_score = score
+        if any(best):
+            out.append(best)
     return out
 
 

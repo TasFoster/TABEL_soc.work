@@ -4,18 +4,15 @@
 зависимостей. Сетевой код по образцу `feedback.py` (User-Agent, timeout, HTTPS-контекст).
 
 Основной канал — GitHub Releases; Яндекс.Диск сохранён как совместимый адаптер.
-В канале обновления там лежат `version.json` (манифест
-версий) и установщики обеих сборок. Программа читает манифест, сравнивает версии и, если
-есть новее, скачивает установщик и запускает его — установщик Inno обновляет программу
-поверх (через мьютекс `TabelAppRunningMutex`). Для portable-копии установщик не запускается
-поверх (см. installation_kind / UpdateDialog) — он лишь скачивается.
-
-Манифест GitHub публикуется вместе с обоими установщиками после успешной сборки.
+Манифест version.json содержит пакеты по платформам и вариантам. Windows запускает
+установщик Inno для установленной копии. Ubuntu загружает проверенный пакет .deb
+для установки пользователем через системный менеджер пакетов.
 """
 
 import hashlib
 import json
 import os
+import platform
 import re
 import ssl
 import subprocess
@@ -54,6 +51,8 @@ class UpdateError(Exception):
 
 def is_configured():
     """Настроен ли канал обновления (задан публичный ключ или тестовый манифест)."""
+    if manifest_key() is None:
+        return False
     if os.environ.get("TABEL_UPDATE_MANIFEST"):
         return True
     if UPDATE_CHANNEL == "github":
@@ -63,6 +62,14 @@ def is_configured():
 
 def variant_key():
     return "full" if app_variant() == "Полная" else "lite"
+
+
+def manifest_key():
+    if sys.platform == "win32":
+        return variant_key()
+    if sys.platform == "linux" and platform.machine().lower() in ("x86_64", "amd64"):
+        return f"linux-amd64-{variant_key()}"
+    return None
 
 
 def current_version():
@@ -138,6 +145,8 @@ def check_for_update():
 
     Бросает при сетевой/форматной ошибке — вызывающий решает, молчать (тихая проверка)
     или показать предупреждение (явная проверка по кнопке)."""
+    if manifest_key() is None:
+        return None
     if os.environ.get("TABEL_UPDATE_MANIFEST"):
         return _read_update(_manifest_url(), "override")
     candidates = []
@@ -164,7 +173,7 @@ def _read_update(url, source):
     manifest = _http_get_json(url)
     if int(manifest.get("schema", 0)) != _SCHEMA:
         raise UpdateError("Неподдерживаемый формат манифеста обновления.")
-    entry = (manifest.get("latest") or {}).get(variant_key())
+    entry = (manifest.get("latest") or {}).get(manifest_key())
     if not entry or not is_newer(entry.get("version"), APP_VERSION):
         return None
     version = entry.get("version", "")
@@ -188,7 +197,8 @@ def _read_update(url, source):
 
 # ----------------------------------------------------------------- загрузка
 def temp_installer_path(version):
-    return os.path.join(tempfile.gettempdir(), f"Tabel_update_{variant_key()}_{version}.exe")
+    extension = "deb" if sys.platform == "linux" else "exe"
+    return os.path.join(tempfile.gettempdir(), f"Tabel_update_{variant_key()}_{version}.{extension}")
 
 
 def _allow_insecure():
@@ -230,6 +240,8 @@ def verify_sha256(path, expected):
 # ----------------------------------------------------------------- установка
 def run_installer(path):
     """Запустить установщик отдельным (detached) процессом, чтобы он пережил выход приложения."""
+    if sys.platform != "win32":
+        raise UpdateError("Установите скачанный пакет через системный менеджер пакетов.")
     flags = 0
     if hasattr(subprocess, "DETACHED_PROCESS"):
         flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -242,6 +254,11 @@ def installation_kind():
     if not getattr(sys, "frozen", False):
         return "source"
     exe_dir = os.path.normcase(os.path.dirname(os.path.abspath(sys.executable)))
+    if sys.platform == "linux":
+        package = "tabel-lite" if variant_key() == "lite" else "tabel"
+        return "installed" if exe_dir == f"/usr/lib/{package}" else "portable"
+    if sys.platform != "win32":
+        return "portable"
     local = os.environ.get("LOCALAPPDATA", "")
     if local:
         expected = os.path.normcase(os.path.join(local, _INSTALL_DIRS[variant_key()]))

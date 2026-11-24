@@ -31,9 +31,12 @@ class CompletionWindow(tk.Toplevel):
         combo.pack(side='left', fill='x', expand=True)
         combo.bind('<<ComboboxSelected>>', lambda e: self.invalidate())
         from .act_gui import open_editor
-        ttk.Button(self, text="Редактор актов…", command=lambda: open_editor(self)).pack(anchor="w", padx=10)
+        editors = ttk.Frame(self, padding=(10, 0))
+        editors.pack(fill="x")
+        ttk.Button(editors, text="Редактор актов…", command=lambda: open_editor(self)).pack(side="left")
+        ttk.Button(editors, text="Правила", command=self.rules).pack(side="left", padx=6)
         actions=ttk.Frame(self,padding=8);actions.pack(fill='x')
-        for title,command in [('Добавить RTF / ZIP',self.add),('Удалить выбранные',self.remove),('Правила',self.rules),('Проверить и подготовить',self.prepare),('Различия',self.diff)]:
+        for title,command in [('Добавить RTF / ZIP',self.add),('Удалить выбранные',self.remove),('Проверить и подготовить',self.prepare),('Различия',self.diff)]:
             ttk.Button(actions,text=title,command=command).pack(side='left',padx=3)
         preview = ttk.Frame(self, padding=(8, 0))
         preview.pack(fill='both', expand=True)

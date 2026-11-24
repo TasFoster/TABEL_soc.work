@@ -77,12 +77,12 @@ class PlanyWindow(tk.Toplevel):
         self.gen_btn = ttk.Button(bottom, text="Сформировать месяц (.odt)",
                                   command=self._generate_one)
         self.gen_btn.pack(side="right")
-        ttk.Button(bottom, text="Редактировать план…", command=self._edit_plan).pack(side="left")
         self.gen_all_btn = ttk.Button(bottom, text="Сформировать все 12 (в папку)",
                                       command=self._generate_all)
         self.gen_all_btn.pack(side="right", padx=6)
         feedback_row = ttk.Frame(self)
         feedback_row.pack(side="bottom", fill="x", before=mid, padx=8)
+        ttk.Button(feedback_row, text="Редактировать план…", command=self._edit_plan).pack(side="right")
         feedback.add_button(feedback_row, self, FEATURE_TITLE, side="left")
         checklist_gui.add_button(feedback_row, self, FEATURE_KEY, FEATURE_TITLE, side="left")
 

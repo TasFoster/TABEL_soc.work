@@ -97,11 +97,11 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils libtcl8.6 libtk8.6 libx11-6 libxext6 libxft2 libxrender1 libfontconfig1
+          sudo apt-get install -y xvfb xauth binutils libtcl8.6 libtk8.6 libx11-6 libxext6 libxft2 libxrender1 libfontconfig1
           python -m pip install -r tabel_app/requirements-build.txt
           python -c "import tkinter, customtkinter, cv2"
-      - name: Unit tests
-        run: python -m unittest discover -s tabel_app/tests -v
+      - name: Unit tests with a desktop display
+        run: xvfb-run -a python -m unittest discover -s tabel_app/tests -v
       - name: Build Ubuntu amd64 packages
         run: tabel_app/tools/build_deb.sh "$RUNNER_TEMP/tabel-release"
       - name: Keep Ubuntu packages

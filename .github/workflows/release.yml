@@ -97,7 +97,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils libx11-6 libxext6 libxft2 libxrender1 libfontconfig1
+          sudo apt-get install -y binutils libtcl8.6 libtk8.6 libx11-6 libxext6 libxft2 libxrender1 libfontconfig1
           python -m pip install -r tabel_app/requirements-build.txt
           python -c "import tkinter, customtkinter, cv2"
       - name: Unit tests

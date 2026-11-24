@@ -16,6 +16,8 @@ mkdir -p "$out"
 cd "$(dirname "$0")/.."
 src=$PWD
 version=$(<VERSION)
+glibc=$(getconf GNU_LIBC_VERSION)
+glibc=${glibc#glibc }
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Некорректный VERSION' >&2; exit 1; }
 
 build=$(mktemp -d)
@@ -53,7 +55,7 @@ done
 for variant in full lite; do
     package=tabel
     title='Табель (полная версия)'
-    dependencies='libc6 (>= 2.35), libx11-6, libxext6, libxft2, libxrender1, libfontconfig1, libfreetype6, libglib2.0-0, libstdc++6, xdg-utils, ca-certificates'
+    dependencies="libc6 (>= $glibc), libx11-6, libxext6, libxft2, libxrender1, libxss1, libfontconfig1, libfreetype6, libglib2.0-0 | libglib2.0-0t64, libstdc++6, xdg-utils, ca-certificates"
     if [[ $variant == full ]]; then
         dependencies+=', tesseract-ocr, tesseract-ocr-rus, tesseract-ocr-eng'
         args=(

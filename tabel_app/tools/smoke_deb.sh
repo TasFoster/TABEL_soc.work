@@ -25,7 +25,7 @@ check_install() {
     desktop-file-validate "/usr/share/applications/$package.desktop"
     rm -f "$XDG_DATA_HOME/$package/selftest_release_result.json"
     xvfb-run -a timeout 120 "$package" --selftest-release --selftest-desktop "$variant" "$version"
-    python - "$XDG_DATA_HOME/$package/selftest_release_result.json" <<'PY'
+    python3 - "$XDG_DATA_HOME/$package/selftest_release_result.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -38,7 +38,7 @@ PY
 
 check_install tabel full 0~smoke
 check_install tabel-lite lite 0~smoke
-python - <<'PY'
+python3 - <<'PY'
 import os
 import sqlite3
 from pathlib import Path
@@ -52,7 +52,7 @@ PY
 sudo apt-get install -y --no-install-recommends "$out/tabel_${version}_amd64.deb" "$out/tabel-lite_${version}_amd64.deb"
 check_install tabel full "$version"
 check_install tabel-lite lite "$version"
-python - <<'PY'
+python3 - <<'PY'
 import os
 import sqlite3
 from pathlib import Path

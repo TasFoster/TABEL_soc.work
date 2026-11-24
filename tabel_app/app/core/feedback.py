@@ -59,17 +59,18 @@ def _system_info(feature_title):
         user = getpass.getuser()
     except Exception:  # noqa: BLE001
         user = os.environ.get("USERNAME", "?")
-    pc = os.environ.get("COMPUTERNAME", "?")
     try:
         import platform
-        win = platform.platform()
+        operating_system = platform.platform()
+        pc = platform.node() or "?"
     except Exception:  # noqa: BLE001
-        win = sys.platform
+        operating_system = sys.platform
+        pc = os.environ.get("COMPUTERNAME", "?")
     when = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
     return {
         "Функция": feature_title or "(главное меню)",
         "Версия": f"{APP_VERSION_DISPLAY}, сборка: {app_variant()}",
-        "Windows": win,
+        "Операционная система": operating_system,
         "Пользователь/ПК": f"{user} / {pc}",
         "Дата": when,
     }

@@ -16,7 +16,7 @@ _VERSION_FILE = os.path.join(_HERE, "..", "..", "VERSION")
 
 # build.ps1 впечатывает сюда значение из VERSION перед сборкой .exe (фолбэк для frozen).
 _EMBEDDED_VERSION = "1.3.0"
-APP_RELEASE_DATE = "2026-06-22"
+APP_RELEASE_DATE = "2026-11-25"
 
 
 def _read_version():

@@ -356,7 +356,8 @@ def _selftest_release():
                 or (("proezd" in keys) != (variant == "full"))):
             raise RuntimeError(f"Unexpected features: {keys}")
         if version.APP_VERSION != expected_version or updater.variant_key() != variant:
-            raise RuntimeError("Wrong embedded version or variant")
+            raise RuntimeError(f"Expected {variant} {expected_version}, "
+                               f"got {updater.variant_key()} {version.APP_VERSION}")
         if variant == "full":
             from app.features.proezd import parser
             if not parser.ocr_available():

@@ -12,7 +12,8 @@ import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 # core -> app -> tabel_app/VERSION
-_VERSION_FILE = os.path.join(_HERE, "..", "..", "VERSION")
+# В PyInstaller пакеты в архиве, поэтому промежуточных каталогов может не быть.
+_VERSION_FILE = os.path.normpath(os.path.join(_HERE, "..", "..", "VERSION"))
 
 # build.ps1 впечатывает сюда значение из VERSION перед сборкой .exe (фолбэк для frozen).
 _EMBEDDED_VERSION = "1.3.0"

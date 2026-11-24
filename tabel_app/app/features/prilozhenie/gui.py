@@ -7,8 +7,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from ..timesheet.calendar_ru import MONTHS_NOM
-from . import FEATURE_TITLE, service, storage
-from ...core import documents, feedback, ui_state
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
+from ...core import checklist_gui, documents, feedback, ui_state
 from .calc import unassigned_ranges
 from .model import SECTOR_LABEL, THRESHOLD, Absence, Period, Redistribution
 
@@ -121,6 +121,7 @@ class PrilozhenieWindow(tk.Toplevel):
         bottom = ttk.Frame(self)
         bottom.pack(fill="x", **pad)
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left")
         self.gen_btn = ttk.Button(bottom, text="Сформировать приложение", command=self._generate)
         self.gen_btn.pack(side="right")
         self.status = ttk.Label(bottom, text="")

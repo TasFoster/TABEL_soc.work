@@ -6,8 +6,8 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, storage
-from ...core import documents, feedback, ui_state
+from . import FEATURE_KEY, FEATURE_TITLE, storage
+from ...core import checklist_gui, documents, feedback, ui_state
 from .calendar_ru import MONTHS_NOM, month_title
 from .service import generate_timesheet
 from .timesheet import days_in_month, validate_absences, display_code
@@ -149,6 +149,7 @@ class TimesheetWindow(tk.Toplevel):
         bottom.pack(fill="x", **pad)
         ttk.Button(bottom, text="Производственный календарь…", command=self._open_calendar).pack(side="left")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=6)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=6)
         self.gen_btn = ttk.Button(bottom, text="Сформировать табель", command=self._generate)
         self.gen_btn.pack(side="right")
         self.status = ttk.Label(bottom, text="")

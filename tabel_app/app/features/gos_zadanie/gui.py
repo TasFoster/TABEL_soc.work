@@ -5,9 +5,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service, storage
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import DEFAULT_ZAV, MONTHS
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 
 def _resolve_worker(source_name, db_list):
@@ -80,6 +80,7 @@ class GosZadanieWindow(tk.Toplevel):
                                   state="disabled")
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=0)
 
     def _pick_source(self):
         f = filedialog.askopenfilename(title="Отчёт по количеству оказанных услуг",

@@ -75,8 +75,8 @@ def _system_info(feature_title):
     }
 
 
-def open_feedback_dialog(master, feature_title=""):
-    return FeedbackDialog(master, feature_title)
+def open_feedback_dialog(master, feature_title="", *, checklist_message=None):
+    return FeedbackDialog(master, feature_title, checklist_message=checklist_message)
 
 
 def add_button(parent, master_window, feature_title, **pack_opts):
@@ -88,33 +88,41 @@ def add_button(parent, master_window, feature_title, **pack_opts):
 
 
 class FeedbackDialog(tk.Toplevel):
-    def __init__(self, master, feature_title=""):
+    def __init__(self, master, feature_title="", *, checklist_message=None):
         super().__init__(master)
-        self.title("Отзывы, жалобы и пожелания")
+        self.title("Отзывы, жалобы и пожелания" if checklist_message is None else "Отправка чек-листа")
         self.geometry("560x520")
         self.minsize(480, 440)
         self.transient(master)
         self.grab_set()
         self.feature_title = feature_title
+        self.checklist_message = checklist_message
         self.info = _system_info(feature_title)
         self.attachments = []
         self._build()
 
     def _build(self):
         pad = {"padx": 10, "pady": 6}
-        cf = ttk.Frame(self)
-        cf.pack(fill="x", **pad)
-        ttk.Label(cf, text="Тип:").pack(side="left")
         self.cat_var = tk.StringVar(value=CATEGORIES[0])
         self.categories = []
-        for c in CATEGORIES:
-            option = ttk.Radiobutton(cf, text=c, value=c, variable=self.cat_var)
-            option.pack(side="left", padx=(6, 0))
-            self.categories.append(option)
-        ttk.Label(self, text="Опишите подробно:").pack(anchor="w", padx=10)
+        if self.checklist_message is None:
+            cf = ttk.Frame(self)
+            cf.pack(fill="x", **pad)
+            ttk.Label(cf, text="Тип:").pack(side="left")
+            for c in CATEGORIES:
+                option = ttk.Radiobutton(cf, text=c, value=c, variable=self.cat_var)
+                option.pack(side="left", padx=(6, 0))
+                self.categories.append(option)
+            ttk.Label(self, text="Опишите подробно:").pack(anchor="w", padx=10)
+        else:
+            self.cat_var.set("Чек-лист")
+            ttk.Label(self, text=self._subject(), wraplength=450).pack(anchor="w", **pad)
         self.text = tk.Text(self, height=6, wrap="word")
         self.text.pack(fill="both", expand=True, padx=10)
         self.text.focus_set()
+        if self.checklist_message is not None:
+            self.text.insert("1.0", self.checklist_message)
+            self.text.configure(state="disabled")
         files = ttk.Frame(self)
         files.pack(fill="x", padx=10)
         self.attach_button = ttk.Button(files, text="Прикрепить файлы…", command=self._attach)
@@ -163,8 +171,9 @@ class FeedbackDialog(tk.Toplevel):
                 return
             except OSError:
                 pass
+        filename = "Отзыв.eml" if self.checklist_message is None else "Чек-лист.eml"
         target = filedialog.asksaveasfilename(parent=self, title="Сохранить письмо для отправки из почтовой программы",
-                                             initialfile="Отзыв.eml", defaultextension=".eml")
+                                             initialfile=filename, defaultextension=".eml")
         if target:
             try:
                 Path(target).write_bytes(content)
@@ -220,7 +229,8 @@ class FeedbackDialog(tk.Toplevel):
                 return
             self.send_button.configure(state="normal", text="Отправить")
             self.attach_button.state(["!disabled"])
-            self.text.configure(state="normal")
+            if self.checklist_message is None:
+                self.text.configure(state="normal")
             for option in self.categories:
                 option.state(["!disabled"])
             if messagebox.askyesno("Не удалось подтвердить отправку",
@@ -236,7 +246,9 @@ class FeedbackDialog(tk.Toplevel):
             urllib.parse.quote(self._subject()),
             urllib.parse.quote(self._body()),
         )
-        ok = False
+        if self.checklist_message is not None and len(url) > 1900:
+            self._open_attached_draft()
+            return
         try:
             ok = webbrowser.open(url)
         except Exception:  # noqa: BLE001

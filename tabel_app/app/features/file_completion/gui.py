@@ -3,8 +3,8 @@ import json
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
-from ...core import feedback
-from . import FEATURE_TITLE, service, storage
+from ...core import checklist_gui, feedback
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 
 HELP = '''1. Выберите вид документа в списке сверху. Для допсоглашений используйте «Допсоглашения на дополнительные услуги».
 2. Добавьте один/несколько RTF или ZIP с документами. В одном запуске обрабатывается выбранный вид документа. Для актов меняется только подписант. В договорах и допсоглашениях заполняются ФИО директора филиала и реквизиты доверенности в обоих блоках подписи. Эти данные доступны в правилах.
@@ -26,6 +26,7 @@ class CompletionWindow(tk.Toplevel):
         top = ttk.Frame(self, padding=8); top.pack(fill='x')
         ttk.Button(top,text='Помощь',command=lambda:self.show_text('Помощь',HELP)).pack(side='right')
         feedback.add_button(top, self, FEATURE_TITLE, side="right", padx=6)
+        checklist_gui.add_button(top, self, FEATURE_KEY, FEATURE_TITLE, side="right", padx=6)
         combo=ttk.Combobox(top,textvariable=self.kind,values=list(service.TYPES.values()),state='readonly',width=30)
         combo.pack(side='left', fill='x', expand=True)
         combo.bind('<<ComboboxSelected>>', lambda e: self.invalidate())

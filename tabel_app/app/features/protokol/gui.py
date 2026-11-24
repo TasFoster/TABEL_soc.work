@@ -6,8 +6,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
-from . import FEATURE_TITLE, service, storage
-from ...core import documents, feedback, ui_state
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
+from ...core import checklist_gui, documents, feedback, ui_state
 
 
 class ProtokolWindow(tk.Toplevel):
@@ -109,6 +109,7 @@ class ProtokolWindow(tk.Toplevel):
         ttk.Button(more, text="Сохранить историю", command=self._save_history).pack(side="left", padx=6)
         ttk.Button(more, text="История", command=self._history).pack(side="left")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left")
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left")
         ttk.Button(bottom, text="Сформировать ODT", command=self._generate).pack(side="right")
         ttk.Button(bottom, text="Сохранить черновик", command=self._save).pack(side="right", padx=6)
 

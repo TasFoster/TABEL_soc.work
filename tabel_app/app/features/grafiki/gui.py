@@ -5,9 +5,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service, storage
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import DEFAULTS
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 
 class GrafikiWindow(tk.Toplevel):
@@ -73,6 +73,7 @@ class GrafikiWindow(tk.Toplevel):
         self.gen_btn = ttk.Button(bottom, text="Сформировать (.xlsx)", command=self._generate)
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=0)
 
     def _reload_combo(self):
         names = [d["name"] for d in self.departments]

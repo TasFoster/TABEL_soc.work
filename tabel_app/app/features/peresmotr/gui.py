@@ -5,10 +5,10 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service
+from . import FEATURE_KEY, FEATURE_TITLE, service
 from .service import MONTHS_NOM
 from .writer import COLS
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 _KEYS = ("fio", "end")
 _TREE_WIDTHS = (360, 150)
@@ -69,6 +69,7 @@ class PeresmotrWindow(tk.Toplevel):
                                   state="disabled")
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=0)
 
     def _month_num(self):
         return service.month_num(self.month_var.get()) or datetime.date.today().month

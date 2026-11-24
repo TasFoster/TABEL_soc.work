@@ -10,10 +10,10 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service, storage
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import DEFAULTS, MONTHS_NOM
 from .writer import COLS
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 _KEYS = ("date", "worker", "client", "address", "phone", "result")
 _TREE_WIDTHS = (80, 190, 190, 260, 120, 160)
@@ -148,6 +148,7 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         self.gen_btn = ttk.Button(bottom, text="Сформировать (.ods)", command=self._generate)
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=0)
 
     # ---------------------------------------------------------------- реквизиты
     def _refresh_defaults(self, *_):

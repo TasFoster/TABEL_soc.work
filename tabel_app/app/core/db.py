@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS settings_kv (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS feature_checklists (
+    feature_key TEXT PRIMARY KEY,
+    version     INTEGER NOT NULL,
+    items       TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS calendar_years (
     year       INTEGER PRIMARY KEY,
     holidays   TEXT,

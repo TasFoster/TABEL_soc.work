@@ -10,9 +10,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE
+from . import FEATURE_KEY, FEATURE_TITLE
 from . import service
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 _COLS = ("sel", "cat", "fio", "worker", "detail")
 _HEADS = ("✔", "Тип", "ФИО", "Соцработник", "Изменение")
@@ -91,6 +91,7 @@ class ReestrOplataWindow(tk.Toplevel):
         ttk.Button(selection, text="Отметить все", command=lambda: self._mark_all(True)).pack(
             side="right", padx=4)
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=6)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=6)
 
     # ------------------------------------------------------------------ файлы
     def _pick_ods(self):

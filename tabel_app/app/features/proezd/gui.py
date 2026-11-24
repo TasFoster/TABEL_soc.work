@@ -8,8 +8,8 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service, storage
-from ...core import documents, feedback, ui_state
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
+from ...core import checklist_gui, documents, feedback, ui_state
 
 # Колонки таблицы = ключи строки (service.ROW_KEYS) + заголовки/ширины.
 COLUMNS = [("num", "№", 36), ("date", "Дата", 92), ("frm", "Откуда", 230),
@@ -108,6 +108,7 @@ class ProezdWindow(tk.Toplevel):
                                   state="disabled")
         self.gen_btn.pack(side="right")
         feedback.add_button(bottom, self, FEATURE_TITLE, side="left", padx=12)
+        checklist_gui.add_button(bottom, self, FEATURE_KEY, FEATURE_TITLE, side="left", padx=0)
 
     # --------------------------------------------------------------- helpers
     def _selected_month(self):

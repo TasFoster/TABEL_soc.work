@@ -11,9 +11,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from . import FEATURE_TITLE, service, storage
+from . import FEATURE_KEY, FEATURE_TITLE, service, storage
 from .service import MONTHS_NOM
-from ...core import documents, feedback, ui_state
+from ...core import checklist_gui, documents, feedback, ui_state
 
 _KEYS = ("month", "worker", "sign")
 _HEADS = ("Месяц", "Соцработник «Заслушивания»", "Есть заслушивание")
@@ -83,6 +83,7 @@ class PlanyWindow(tk.Toplevel):
         feedback_row = ttk.Frame(self)
         feedback_row.pack(side="bottom", fill="x", before=mid, padx=8)
         feedback.add_button(feedback_row, self, FEATURE_TITLE, side="left")
+        checklist_gui.add_button(feedback_row, self, FEATURE_KEY, FEATURE_TITLE, side="left")
 
     # ---------------------------------------------------------------- данные
     def _dept(self):

@@ -57,6 +57,7 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         # правка реквизитов обновляет дефолтные заголовок/подпись (если их не меняли)
         self.dept_var.trace_add("write", self._refresh_defaults)
         self.zav_var.trace_add("write", self._refresh_defaults)
+        self.year_var.trace_add("write", self._reload_thursdays)
 
     # ---------------------------------------------------------------- разметка
     def _build(self):
@@ -72,8 +73,8 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         mcombo.grid(row=0, column=1, sticky="w", padx=4)
         mcombo.bind("<<ComboboxSelected>>", lambda e: self._reload_thursdays())
         ttk.Label(g, text="Год:").grid(row=0, column=2, sticky="w")
-        tk.Spinbox(g, from_=2024, to=2035, textvariable=self.year_var, width=6,
-                   command=self._reload_thursdays).grid(row=0, column=3, sticky="w", padx=4)
+        tk.Spinbox(g, from_=2024, to=2035, textvariable=self.year_var, width=6).grid(
+            row=0, column=3, sticky="w", padx=4)
         ttk.Label(g, text="Отд. №:").grid(row=0, column=4, sticky="w", padx=(12, 0))
         ttk.Entry(g, textvariable=self.dept_var, width=5).grid(row=0, column=5, sticky="w", padx=4)
         ttk.Label(g, text="Зав. отделением:").grid(row=0, column=6, sticky="w", padx=(12, 0))
@@ -111,7 +112,7 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         ttk.Button(a, text="Добавить в таблицу", command=self._add_selected).grid(
             row=0, column=4, padx=(12, 0))
 
-        cbox = ttk.LabelFrame(assign, text="Клиенты соцработника (отметьте нужных)")
+        cbox = ttk.LabelFrame(assign, text="Клиенты соцработника (отметьте от 1 до 5)")
         cbox.pack(fill="both", expand=True, padx=6, pady=(0, 4))
         canvas = tk.Canvas(cbox, borderwidth=0, highlightthickness=0, height=110)
         sb = ttk.Scrollbar(cbox, orient="vertical", command=canvas.yview)
@@ -164,15 +165,15 @@ class ProverkaKachestvaWindow(tk.Toplevel):
     def _month_num(self):
         return service.month_num(self.month_var.get()) or datetime.date.today().month
 
-    def _reload_thursdays(self):
+    def _reload_thursdays(self, *_):
         try:
             self._thursdays = service.month_thursdays(int(self.year_var.get()), self._month_num())
-        except Exception:  # noqa: BLE001
+        except (tk.TclError, ValueError):
             self._thursdays = []
         labels = [service.format_date(d) for d in self._thursdays]
         self.thu_combo["values"] = labels
-        if labels and self.thu_var.get() not in labels:
-            self.thu_var.set(labels[0])
+        if self.thu_var.get() not in labels:
+            self.thu_var.set(labels[0] if labels else "")
 
     # ---------------------------------------------------------------- источник
     def _pick_source(self):
@@ -222,18 +223,20 @@ class ProverkaKachestvaWindow(tk.Toplevel):
         if not date:
             messagebox.showwarning("Нет даты", "Выберите четверг.")
             return
-        added = 0
-        for client, address, var in self._client_vars:
-            if var.get():
-                self._rows.append({
-                    "date": date, "worker": worker, "client": client,
-                    "address": address, "phone": storage.load_phone(client) or "",
-                    "result": "нет"})
-                var.set(False)
-                added += 1
-        if not added:
+        selected = [(client, address, var) for client, address, var in self._client_vars
+                    if var.get()]
+        if not selected:
             messagebox.showinfo("Никто не отмечен", "Отметьте хотя бы одного клиента.")
             return
+        if len(selected) > 5:
+            messagebox.showwarning("Слишком много клиентов", "Отметьте от 1 до 5 клиентов.")
+            return
+        for client, address, var in selected:
+            self._rows.append({
+                "date": date, "worker": worker, "client": client,
+                "address": address, "phone": storage.load_phone(client) or "",
+                "result": "нет"})
+            var.set(False)
         self._refresh_tree()
 
     def _add_empty(self):

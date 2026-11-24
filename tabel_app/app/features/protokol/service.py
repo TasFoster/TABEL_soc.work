@@ -37,8 +37,7 @@ def _plan_for(department, year, month):
 
 def new_draft(department, year, month, production_calendar):
     meeting = last_working_wednesday(year, month, production_calendar)
-    agenda, report = _plan_for(department, year, month)
-    report = reports_from_plan(department, year, month)
+    agenda, _ = _plan_for(department, year, month)
     return {
         "number": str(month),
         "date": meeting.strftime("%d.%m.%Y") if meeting else "",
@@ -47,7 +46,7 @@ def new_draft(department, year, month, production_calendar):
                    for employee in department["employees"]
                    if "работник" in (employee.get("position") or "").lower()],
         "agenda": "\n".join(agenda),
-        "planned_report": report,
+        "planned_report": reports_from_plan(department, year, month),
         "speaker": "",
         "decisions": "",
         "other": "",
@@ -74,17 +73,15 @@ def document_data(department, year, month, draft):
               for p in draft["people"] if not p["present"]]
     agenda = [line.strip() for line in draft["agenda"].splitlines() if line.strip()]
     speaker = draft["speaker"].strip()
-    report = draft["planned_report"].strip()
-    if speaker and report.startswith("Отчёт социального работника "):
-        report = "Отчёт социального работника."
-    if report:
-        agenda.extend(report.splitlines())
+    reports = draft["planned_report"].strip().splitlines()
+    if speaker and reports and reports[0].startswith("Отчёт социального работника "):
+        reports[0] = "Отчёт социального работника."
+    agenda.extend(reports)
     agenda.append("Разное.")
     body = ["Повестка дня:", *(f"{i}. {line}" for i, line in enumerate(agenda, 1))]
-    if speaker or report or draft["decisions"].strip():
+    if speaker or reports or draft["decisions"].strip():
         body.extend(("", "Слушали:"))
-        if report:
-            body.extend(report.splitlines())
+        body.extend(reports)
         if speaker:
             body.append(f"Докладчик: {speaker}.")
         body.extend(draft["decisions"].splitlines())

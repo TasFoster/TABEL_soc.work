@@ -43,6 +43,7 @@ class ProtocolTest(unittest.TestCase):
                              {"name": "Тестовый Иван Иванович", "present": False, "reason": "Отпуск"}])
         draft["planned_report"] = "Отчёт социального работника Тестовой А. Б."
         original_speaker = draft["planned_report"]
+        draft["planned_report"] += "\nВторой отчёт о работе отделения."
         with tempfile.TemporaryDirectory() as directory, patch(
             "app.core.storage.app_base_dir", return_value=directory
         ):
@@ -59,6 +60,7 @@ class ProtocolTest(unittest.TestCase):
                          "Согласовали график", "Уточнили сроки"):
                 self.assertIn(line, lines)
             self.assertNotIn(original_speaker, lines)
+            self.assertIn("Второй отчёт о работе отделения.", lines)
             reloaded["speaker"] = ""
             service.generate(str(out), dept, 2026, 11, reloaded)
             lines = [extractText(p) for p in load(str(out)).getElementsByType(P)]

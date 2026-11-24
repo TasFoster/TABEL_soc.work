@@ -181,7 +181,7 @@ def _parse_dengi(m):
         label0 = _txt(cells, 0)
         worker = _txt(cells, 1)
         formula = ob._ga(cells.get(2), "formula") or ""
-        if label0.startswith("Итого") or worker.startswith("Итого"):
+        if label0.casefold().startswith("итого") or worker.casefold().startswith("итого"):
             m.dengi_itogo_row = row
             continue
         if _is_num(label0) and worker:

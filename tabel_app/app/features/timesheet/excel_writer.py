@@ -198,7 +198,10 @@ def generate(template_path, out_path, context, keep_open=False):
             ws.row(r).height_mismatch = True
     # Разрывы только между целыми парами. Запас по высоте учитывает
     # повторяемую шапку и поля A4, масштаб печати никогда не увеличивает лист.
-    total_width_points = sum(ws.col(c).width / 256 * 7 * 0.75 for c in range(sheet.ncols))
+    # Резерв на округление ширины и различия отрисовки каждого столбца:
+    # без него LibreOffice переносит правые колонки на отдельные страницы.
+    total_width_points = sum((ws.col(c).width / 256 * 7 + 3) * 0.75
+                             for c in range(sheet.ncols))
     scale = max(10, min(100, math.floor(790 / total_width_points * 100)))
     header_height = sum(ws.row(r).height for r in range(14))
     # A4 альбомный: 210 мм по высоте, поля по 0.3 дюйма.

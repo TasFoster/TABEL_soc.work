@@ -103,11 +103,11 @@ def _header_rows(ws):
     return out
 
 
-def _parse_block(ws, hr):
+def _parse_block(ws, hr, next_header=None):
     """Клиенты блока, начиная со строки заголовка hr. -> ([(fio, {canon: val})], colmap)."""
     cm = _colmap(ws, hr)
     clients = []
-    for r in range(hr + 1, ws.max_row + 1):
+    for r in range(hr + 1, next_header or ws.max_row + 1):
         fio = ws.cell(r, 2).value
         n1 = ws.cell(r, 1).value
         is_client = fio and str(fio).strip() and isinstance(n1, (int, float))
@@ -148,7 +148,7 @@ def read_benefit(path):
     if part is not None:
         hrs = _header_rows(part)
         if hrs:  # первый блок — количества
-            out["part_cnt_clients"], _ = _parse_block(part, hrs[0])
+            out["part_cnt_clients"], _ = _parse_block(part, hrs[0], hrs[1] if len(hrs) > 1 else None)
             out["part_cnt_agg"] = _aggregate(out["part_cnt_clients"])
         if len(hrs) >= 2:  # второй блок — деньги
             out["part_money_clients"], _ = _parse_block(part, hrs[1])

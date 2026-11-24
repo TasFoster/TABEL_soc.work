@@ -13,7 +13,7 @@ from app.features.prilozhenie import model as pm, calc, service as ps, excel_wri
 from app.features.reestr_oplata import model as rm, service as rs, ods_editor as ed
 from app.features.plany import service as plans, storage as plan_store
 from app.features.uslugi_dengi.writer import _fill_ud
-from odf.table import TableRow, TableCell
+from odf.table import Table, TableRow, TableCell
 from odf.text import P
 
 class FeedbackFixes(unittest.TestCase):
@@ -65,6 +65,29 @@ class FeedbackFixes(unittest.TestCase):
             rs.apply_plan(model,plan,journal)
         self.assertEqual(client.contract,'NEW')
         self.assertIn('NEW',ed.ob.cell_text(ed.ob.logical_cells(row,3)[3]))
+
+    def test_uppercase_money_total_is_rebuilt(self):
+        def row(table, *values):
+            tr = TableRow()
+            for value in values:
+                cell = TableCell(valuetype='string')
+                cell.addElement(P(text=value))
+                tr.addElement(cell)
+            table.addElement(tr)
+            return tr
+
+        gos, money = Table(name='Гос_'), Table(name='деньги')
+        client = rm.GosClient(row(gos, 'Тестовый'), False, 1, 'Тестовый', 'тестовый',
+                              '', '', 100, 100, '', 25)
+        block = rm.GosBlock('Работник', None, None, row(gos, 'Итого'), [client])
+        row(money, '1', 'Работник', '')
+        total = row(money, '', 'ИТОГО:', 'прежняя сумма')
+        model = rm.RegistryModel(None, gos, None, money, gos_blocks=[block])
+        ed._parse_dengi(model)
+        ed._rebuild_dengi(model)
+        cell = ed.ob.logical_cells(total, ed.DENGI_SUMMA)[ed.DENGI_SUMMA]
+        self.assertEqual(cell.getAttribute('formula'), 'of:=SUM([.C1:.C1])')
+        self.assertEqual(float(cell.getAttribute('value')), 125)
 
     def test_timesheet_print_titles(self):
         out=self.path/'t.xls'

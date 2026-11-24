@@ -1,15 +1,17 @@
 """Чтение поездок из файла соцработника и (best-effort) распознавание билетов.
 
-* read_trips(.ods) — берёт поездки (дата/откуда/куда/цель) из файла вида образца.
+* read_trips(.ods/.xls/.xlsx) — читает поездки из маршрутного листа.
 * ocr_tickets(.jpg) — пытается распознать билеты со скана (офлайн).
   Распознавание этих цветных/повёрнутых билетов НЕнадёжно, поэтому результат —
   лишь предзаполнение: номер/серию/цену пользователь сверяет и правит вручную.
 """
 
+import datetime
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from odf.opendocument import load
 from odf.style import Style, TableCellProperties
@@ -23,9 +25,14 @@ def _report_sheet(doc):
     tables = doc.spreadsheet.getElementsByType(Table)
     for t in tables:
         nm = (t.getAttribute("name") or "").lower()
-        if "отчет" in nm or "проезд" in nm:
+        if _is_report_name(nm):
             return t
     return tables[0]
+
+
+def _is_report_name(name):
+    name = name.lower().replace("ё", "е")
+    return "отчет" in name or "проезд" in name
 
 
 def _bg_map(doc):
@@ -63,25 +70,67 @@ def _row_is_dop(cells, bg):
     return False
 
 
-def read_trips(ods_path):
-    """Вернуть (trips, header). trips — список {date, frm, to, purpose, dop}.
+def _display_value(value):
+    if isinstance(value, datetime.date):
+        return value.strftime("%d.%m.%Y")
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return "" if value is None else str(value).strip()
 
-    dop=True у дополнительных поездок (помечены голубым в исходном файле) — нужно для
-    группировки строк по дням при простановке дат (см. service.assign_dates)."""
-    doc = load(ods_path)
+
+def _ods_rows(path):
+    doc = load(path)
     t = _report_sheet(doc)
     bg = _bg_map(doc)
-    trips, header = [], {}
     for start, row, rep in ob.logical_rows(t):
-        cells = ob.logical_cells(row, 5)
+        cells = ob.logical_cells(row, 4)
+        values = [ob.cell_text(cells[c]).strip() if c in cells else "" for c in range(5)]
+        if not values[1] and 1 in cells:
+            date_value = cells[1].getAttribute("datevalue")
+            if date_value:
+                values[1] = _display_value(datetime.datetime.fromisoformat(date_value))
+        yield start, values, _row_is_dop(cells, bg)
 
-        def cv(c):
-            return ob.cell_text(cells[c]).strip() if c in cells else ""
 
-        c0 = cv(0)
+def _xlsx_rows(path):
+    from openpyxl import load_workbook
+
+    book = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheet = next((sheet for sheet in book.worksheets if _is_report_name(sheet.title)), book.worksheets[0])
+        for i, row in enumerate(sheet.iter_rows(max_col=5, values_only=True)):
+            yield i, [_display_value(value) for value in row], False
+    finally:
+        book.close()
+
+
+def _xls_rows(path):
+    import xlrd
+
+    with xlrd.open_workbook(path) as book:
+        sheet = next((sheet for sheet in book.sheets() if _is_report_name(sheet.name)), book.sheet_by_index(0))
+        for i in range(sheet.nrows):
+            values = []
+            for col, cell in enumerate(sheet.row_slice(i, end_colx=5)):
+                value = cell.value
+                if col == 1 and cell.ctype == xlrd.XL_CELL_DATE:
+                    value = xlrd.xldate_as_datetime(value, book.datemode)
+                values.append(_display_value(value))
+            yield i, values + [""] * (5 - len(values)), False
+
+
+def read_trips(path):
+    """Вернуть поездки и шапку маршрутного листа из ODS, XLS или XLSX."""
+    readers = {".ods": _ods_rows, ".xls": _xls_rows, ".xlsx": _xlsx_rows}
+    reader = readers.get(Path(path).suffix.lower())
+    if reader is None:
+        raise ValueError("Выберите таблицу поездок в формате ODS, XLS или XLSX.")
+    trips, header = [], {}
+    for start, values, dop in reader(path):
+        c0, date, frm, to, purpose = values
+
         if c0.isdigit() and start >= 6:
-            trips.append({"date": cv(1), "frm": cv(2), "to": cv(3), "purpose": cv(4),
-                          "dop": _row_is_dop(cells, bg)})
+            trips.append({"date": date, "frm": frm, "to": to, "purpose": purpose, "dop": dop})
         elif "Ф.И.О" in c0:
             header["worker_full"] = re.sub(r"^.*сотрудника", "", c0).strip()
         elif c0.startswith("Наименование должности"):

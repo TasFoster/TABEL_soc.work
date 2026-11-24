@@ -105,9 +105,12 @@ class UslugiDengiWindow(tk.Toplevel):
         year = int(self.year_var.get())
         month = self._month_num()
         # Предыдущий отчёт: указанный вручную или авто-поиск в архиве (прошлый месяц).
-        prev_path = self.fprev.get().strip()
+        prev_path = self.fprev.get().strip() if month > 1 else ""
         prev_auto = False
-        if not prev_path or not os.path.exists(prev_path):
+        if prev_path and not os.path.isfile(prev_path):
+            messagebox.showwarning("Нет файла", "Проверьте путь к отчёту за прошлый месяц.")
+            return
+        if not prev_path:
             prev_path = service.find_prev_report(month, year) or ""
             prev_auto = bool(prev_path)
         self.info.set("Чтение и формирование…")
@@ -140,7 +143,9 @@ class UslugiDengiWindow(tk.Toplevel):
         self.gen_btn.config(state="normal")
         free = len(data.get("free_clients", []))
         part = len(data.get("part_cnt_clients", []))
-        if data.get("prev_ud"):
+        if month == 1:
+            base_note = " Накопление начато с января."
+        elif data.get("prev_ud"):
             base = "из прошлого отчёта (архив)" if prev_auto else "из указанного отчёта"
             base_note = f" Накоплено к значениям {base}."
         else:

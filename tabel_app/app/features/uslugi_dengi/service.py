@@ -58,4 +58,6 @@ def period_text(month, year, dept="9"):
 
 def generate(data, out_path, month=None, year=None, dept="9"):
     pt = period_text(month, year, dept) if (month and year) else None
+    if month == 1:
+        data = {**data, "prev_ud": {}}
     return _generate(storage.template_path(), out_path, data, pt)

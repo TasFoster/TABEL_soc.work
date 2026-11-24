@@ -383,9 +383,11 @@ def _selftest_release():
             from app.features.file_completion import storage as completion_storage, service as completion_service, rtf
             rules = completion_storage.load_rules()
             completion_service.validate_rules(rules)
-            rule = rules['additional'][0]
-            sample = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(
-                'Договор о предоставлении дополнительных социальных услуг\n' + rule['before']) + '}').encode('ascii')
+            sample_text = 'Договор о предоставлении дополнительных социальных услуг\n'
+            sample_text += ''.join(
+                (rule['before'] + '\n') * rule['count'] for rule in rules['additional']
+            )
+            sample = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(sample_text) + '}').encode('ascii')
             completed, _, difference = completion_service.transform(sample, 'additional', rules)
             if not difference or completion_service.transform(completed, 'additional', rules)[2]:
                 raise RuntimeError('File completion smoke test failed')

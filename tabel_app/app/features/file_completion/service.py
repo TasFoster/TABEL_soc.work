@@ -67,23 +67,25 @@ def transform(raw, kind, rules):
         zero = float(match[1].replace(' ','').replace(',','.')) == 0
         if zero != (kind == 'free'):
             raise ValueError('Сумма договора не соответствует выбранному типу.')
-    states = []
+    draft_rules = []
     for rule in rules[kind]:
         before, after = locate_before(text,rule), locate(text,rule['after'])
         # after может содержать before (добавление предложения).
         covered = [b for b in before if not any(a.start()<=b.start() and b.end()<=a.end() for a in after)]
         if len(after)==rule['count'] and not covered:
-            states.append('done')
+            continue
         elif len(covered)==rule['count'] and not after:
-            states.append('draft')
+            draft_rules.append(rule)
         else:
             raise ValueError('Неоднозначный или частично дополненный файл: проверьте текст и правила.')
-    if all(s=='done' for s in states):
+    if not draft_rules:
         return raw, 'Уже готов — пропущен', ''
-    if any(s=='done' for s in states):
+    # Оплата и блоки подписи в договорах на допуслуги могли быть заполнены
+    # независимо. Для каждой строки по-прежнему требуется полное совпадение.
+    if kind != 'additional' and len(draft_rules) != len(rules[kind]):
         raise ValueError('Часть дополнений уже внесена. Требуется ручная проверка.')
     result = raw
-    for rule in rules[kind]:
+    for rule in draft_rules:
         # При замене справа налево смещения слева остаются действительными.
         for m in reversed(locate_before(parsed[0], rule)):
             result = rtf.replace(result, m.start(), m.end(), rule['after'], parsed)

@@ -39,8 +39,61 @@ class CompletionTests(unittest.TestCase):
         draft = rtf.replace(raw, *match.span(), rule['before_variants'][0])
         result, _, diff = service.transform(draft, 'additional', RULES)
         self.assertTrue(diff)
-        self.assertEqual(rtf.parse(result)[0], rtf.parse(raw)[0].replace(rule['before'], rule['after']))
+        expected = rtf.parse(raw)[0]
+        for standard in RULES['additional']:
+            expected = expected.replace(standard['before'], standard['after'])
+        self.assertEqual(rtf.parse(result)[0], expected)
         self.assertEqual(service.transform(result, 'additional', RULES)[2], '')
+
+    def test_additional_contract_completes_payment_and_both_signatures_independently(self):
+        payment, signature, authority = RULES['additional']
+        original_text = ('Договор о предоставлении дополнительных социальных услуг\n'
+                         'Заказчик Тестов Тест Тестович\n' + payment['before'] + '\n')
+        original_text += ('Директор\n' + signature['before'] + '\n' +
+                          authority['before'] + '\nМ.П.\tЗаказчик\n') * 2
+        expected = original_text
+        for rule in (payment, signature, authority):
+            expected = expected.replace(rule['before'], rule['after'])
+
+        for already_complete in ((), (payment,), (signature, authority)):
+            with self.subTest(already_complete=len(already_complete)):
+                draft = original_text
+                for rule in already_complete:
+                    draft = draft.replace(rule['before'], rule['after'])
+                raw = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(draft) + '}').encode('ascii')
+                result, _, diff = service.transform(raw, 'additional', RULES)
+                self.assertTrue(diff)
+                self.assertEqual(rtf.parse(result)[0], expected)
+                self.assertEqual(service.transform(result, 'additional', RULES),
+                                 (result, 'Уже готов — пропущен', ''))
+
+        draft = original_text.replace(signature['before'], signature['after'], 1)
+        raw = ('{\\rtf1\\ansi\\uc1 ' + rtf.escape(draft) + '}').encode('ascii')
+        with self.assertRaisesRegex(ValueError, 'частично дополненный'):
+            service.transform(raw, 'additional', RULES)
+
+    def test_legacy_additional_payment_rules_gain_signature_fields(self):
+        from unittest.mock import patch
+        from app.features.file_completion import storage
+        with tempfile.TemporaryDirectory() as directory, patch(
+            'app.core.storage.app_base_dir', return_value=directory
+        ):
+            folder = Path(directory) / 'data/file_completion'
+            folder.mkdir(parents=True)
+            path = folder / 'rules.json'
+            payment, signature, authority = RULES['additional']
+            custom_payment = dict(payment, after='Согласованный порядок оплаты.')
+            existing = {'additional': [custom_payment]}
+            path.write_text(json.dumps(existing), encoding='utf-8')
+            loaded = storage.load_rules()
+            self.assertEqual(loaded['additional'], [custom_payment, signature, authority])
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8')), existing)
+
+            custom_signature = dict(signature, before='Пустая подпись', after='Новая подпись')
+            loaded['additional'][1] = custom_signature
+            storage.save_rules(loaded)
+            self.assertEqual(storage.load_rules()['additional'],
+                             [custom_payment, custom_signature, authority])
 
     def test_additional_agreement_changes_only_signature_fields(self):
         kind = 'additional_agreement'

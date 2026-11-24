@@ -18,6 +18,15 @@ def load_rules():
                     for variant in standard.get('before_variants', []):
                         if variant not in variants:
                             variants.append(variant)
+        if 'additional' in custom:
+            rows = custom['additional']
+            for standard in defaults['additional']:
+                identifier = standard.get('id')
+                if identifier and not any(
+                    rule.get('id') == identifier or rule.get('before') == standard['before']
+                    for rule in rows
+                ):
+                    rows.append(standard)
         defaults.update(custom)
     return defaults
 

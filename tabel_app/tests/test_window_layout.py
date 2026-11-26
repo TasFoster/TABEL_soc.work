@@ -4,6 +4,7 @@ import sys
 import tempfile
 import tkinter as tk
 import unittest
+from datetime import date
 from pathlib import Path
 from tkinter import ttk
 from unittest.mock import patch
@@ -11,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core import db, feedback, storage
+from app.features.file_completion import act_gui
 from app.features.file_completion.gui import open_file_completion
 from app.features.plany.gui import open_plany
 from app.features.protokol.gui import open_protokol
@@ -99,3 +101,36 @@ class WindowLayoutTest(unittest.TestCase):
                     window.destroy()
         dialog = feedback.open_feedback_dialog(self.root, "Проверка")
         self.assert_buttons_fit(dialog)
+
+    def test_act_editor_uses_current_fields_on_each_batch(self):
+        act_gui.open_editor(self.root)
+        dialog, = self.root.winfo_children()
+        button, = buttons(dialog)
+        period, signing_date, worker, director = (
+            child for child in dialog.winfo_children() if isinstance(child, ttk.Entry)
+        )
+        paths = ("исходный-ноябрь.rtf", "исходный-октябрь.docx")
+        folder = Path("результаты")
+        targets = (folder / "Получатель Первый акт.rtf", folder / "Получатель Второй акт.docx")
+        finished = tk.BooleanVar(dialog)
+
+        with (patch.object(act_gui.filedialog, "askopenfilenames", return_value=paths),
+              patch.object(act_gui.filedialog, "askdirectory", return_value=str(folder)),
+              patch.object(act_gui, "prepare", side_effect=targets * 2) as prepare,
+              patch.object(act_gui.messagebox, "showinfo", side_effect=lambda *a, **k: finished.set(True)) as report):
+            for expected in ((None, None, "", director.get()),
+                             (date(2026, 12, 1), date(2026, 12, 30), "Работник Р.Р.", director.get())):
+                if expected[0] is not None:
+                    period.insert(0, "12.2026")
+                    signing_date.insert(0, "30.12.2026")
+                    worker.insert(0, "Работник Р.Р.")
+                finished.set(False)
+                button.invoke()
+                timeout = dialog.after(3000, lambda: finished.set(False))
+                dialog.wait_variable(finished)
+                dialog.after_cancel(timeout)
+                self.assertTrue(finished.get(), "Редактор не показал результаты")
+                self.assertFalse(button.instate(["disabled"]))
+                self.assertEqual([call.args for call in prepare.call_args_list[-2:]],
+                                 [(Path(path), folder, *expected) for path in paths])
+                self.assertIn(f"{paths[0]} → {targets[0].name}", report.call_args.args[1])

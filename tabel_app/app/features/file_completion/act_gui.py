@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 import threading
 from queue import SimpleQueue
@@ -6,33 +6,39 @@ from tkinter import Toplevel, StringVar, filedialog, messagebox, ttk
 
 from ..timesheet.calendar_ru import ProductionCalendar
 from ..timesheet.storage import load_calendar
-from .act_editor import prepare, signing_day
+from .act_editor import prepare
 
 
 def open_editor(parent):
     window = Toplevel(parent)
     window.title("Редактор актов")
     window.resizable(False, False)
-    month = date.today()
     production = ProductionCalendar(load_calendar())
-    ttk.Label(window, text=f"Период услуг: {month:%m.%Y}").pack(pady=5)
     fields = []
-    for title, initial in (("Дата подписания", signing_day(month, production).strftime("%d.%m.%Y")),
+    for title, initial in (("Период услуг (ММ.ГГГГ)", ""),
+                           ("Дата подписания (ДД.ММ.ГГГГ)", ""),
                            ("Социальный работник (пусто — оставить из акта)", ""),
                            ("Директор филиала", "Колесниченко Е.И.")):
-        ttk.Label(window, text=title).pack()
+        ttk.Label(window, text=title).pack(pady=(5, 0))
         value = StringVar(window, initial)
         ttk.Entry(window, textvariable=value, width=48).pack(padx=12, pady=4)
         fields.append(value)
+    ttk.Label(window, text="Пустой период — следующий месяц от периода каждого акта.\n"
+                          "Пустая дата — последний рабочий день нового периода.",
+              justify="center").pack(padx=12, pady=5)
     status = StringVar(window, "Для проверки одной страницы нужен Word или LibreOffice.")
     ttk.Label(window, textvariable=status).pack(padx=12)
 
     def run():
+        period, signing_date, worker, director = [value.get().strip() for value in fields]
         try:
-            signed = datetime.strptime(fields[0].get(), "%d.%m.%Y").date()
+            month = datetime.strptime(period, "%m.%Y").date() if period else None
+        except ValueError:
+            return messagebox.showerror("Период услуг", "Введите период в формате ММ.ГГГГ.", parent=window)
+        try:
+            signed = datetime.strptime(signing_date, "%d.%m.%Y").date() if signing_date else None
         except ValueError:
             return messagebox.showerror("Дата", "Введите дату в формате ДД.ММ.ГГГГ.", parent=window)
-        worker, director = [v.get().strip() for v in fields[1:]]
         if not director:
             return messagebox.showerror("Директор", "Укажите ФИО директора.", parent=window)
         paths = filedialog.askopenfilenames(parent=window, filetypes=[("Акты (RTF, DOC, DOCX)", "*.rtf *.doc *.docx")])
@@ -46,14 +52,16 @@ def open_editor(parent):
         def process():
             report = []
             for name in paths:
+                source = Path(name)
                 try:
-                    target = prepare(Path(name), Path(folder), month, signed, worker, director)
+                    target = prepare(source, Path(folder), month, signed, worker, director,
+                                     production=production)
+                    result = f"{source.name} → {target.name}"
                     if target.suffix == ".rtf":
-                        report.append(f"{target.name} — сохранён в RTF. Проверьте разбивку на страницы перед печатью.")
-                    else:
-                        report.append(target.name)
+                        result += " — проверьте разбивку на страницы перед печатью."
+                    report.append(result)
                 except Exception as exc:
-                    report.append(f"{Path(name).name}: {exc}")
+                    report.append(f"{source.name}: {exc}")
             queue.put(report)
         def poll():
             if queue.empty():

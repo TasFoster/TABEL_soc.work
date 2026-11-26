@@ -17,6 +17,11 @@ from .names import recipient
 from . import rtf
 
 GEN = "января февраля марта апреля мая июня июля августа сентября октября ноября декабря".split()
+NOM = [name.lower() for name in MONTHS_NOM]
+SPACE = r"[^\S\r\n\t]"
+FIELD_START = rf"(?:^|\t){SPACE}*"
+PERIOD_START = rf"{FIELD_START}(?:№[^\r\n\t]*?{SPACE}+)?за{SPACE}+"
+PERIOD = rf"{PERIOD_START}(({'|'.join(NOM[1:])}){SPACE}+(\d{{4}}))(?={SPACE}*г)"
 
 
 def month_end(day):
@@ -87,16 +92,38 @@ def replace_match(paragraph, match, replacement):
         offset = limit
 
 
-def field_rules(month, signed, worker, director):
+def field_rules(text, month, signed, worker, director, production):
+    periods = {
+        date(int(year), NOM.index(name.lower()), 1)
+        for _, name, year in re.findall(PERIOD, text, re.I | re.M)
+    }
+    if len(periods) != 1:
+        raise ValueError("Не удалось однозначно определить месяц услуг в заголовке акта.")
+    source_month = periods.pop()
+    if month is None:
+        month = month_end(source_month) + timedelta(days=1)
+    if signed is None:
+        if production is None:
+            raise ValueError("Укажите дату подписания или производственный календарь.")
+        signed = signing_day(month, production)
+
     dates = f"{month.replace(day=1):%d.%m.%Y} - {month_end(month):%d.%m.%Y}"
+    first = re.escape(f"{source_month:%d.%m.%Y}")
+    last = re.escape(f"{month_end(source_month):%d.%m.%Y}")
+    director_label = rf"Директор(?:{SPACE}+филиала)?"
+    signature = rf"{SPACE}+_+{SPACE}*"
     rules = [
-        (r"\bза\s+([а-яё]+\s+\d{4})(?=\s*г)", MONTHS_NOM[month.month].lower()+f" {month.year}"),
-        (r"(\d{2}\.\d{2}\.\d{4}\s*[-–—]\s*\d{2}\.\d{2}\.\d{4})", dates),
-        (r"^\s*([«\"]\d{1,2}[»\"]\s+[а-яё]+\s+\d{4})(?=\s*г)", f"«{signed.day}» {GEN[signed.month-1]} {signed.year}"),
-        (r"^\s*(Директор(?:\s+филиала)?\s+_+\s*\([^)]*\))", f"Директор филиала _________________________ ({director})"),
+        (PERIOD, f"{NOM[month.month]} {month.year}"),
+        (rf"{FIELD_START}({first}{SPACE}*[-–—‑]{SPACE}*{last})(?={SPACE}*(?:\t|$))", dates),
+        (rf"{FIELD_START}([«\"]\d{{1,2}}[»\"]{SPACE}+[а-яё]+{SPACE}+\d{{4}})(?={SPACE}*г)",
+         f"«{signed.day}» {GEN[signed.month-1]} {signed.year}"),
+        (rf"{FIELD_START}({director_label})(?={signature}\()", "Директор филиала"),
+        (rf"{FIELD_START}{director_label}{signature}(\([^()\r\n]*\))",
+         f"({director})"),
     ]
     if worker:
-        rules.append((r"Социальный работник\s+_+\s*\(([^)]*)\)", worker))
+        rules.append((rf"{FIELD_START}Социальный{SPACE}+работник{signature}(\([^()\r\n]*\))",
+                      f"({worker})"))
     return rules
 
 
@@ -125,26 +152,27 @@ def act_recipient(text):
     return client
 
 
-def prepare(source, folder, month, signed, worker, director):
+def prepare(source, folder, month, signed, worker, director, *, production=None):
     try:
-        return prepare_docx(source, folder, month, signed, worker, director)
+        return prepare_docx(source, folder, month, signed, worker, director, production=production)
     except ConversionError:
         if source.suffix.lower() != ".rtf":
             raise
     raw = source.read_bytes()
     text, spans = rtf.parse(raw)
     client = act_recipient(text)
-    for pattern, value in field_rules(month, signed, worker, director):
+    for pattern, value in field_rules(text, month, signed, worker, director, production):
         matches = list(re.finditer(pattern, text, re.I | re.M))
         if not matches:
             raise ValueError("Не найдено поле для замены: " + value)
         for match in reversed(matches):
-            raw = rtf.replace(raw, *match.span(1), value, (text, spans))
+            if match[1] != value:
+                raw = rtf.replace(raw, *match.span(1), value, (text, spans))
         text, spans = rtf.parse(raw)
     return save_act(folder, client, ".rtf", raw)
 
 
-def prepare_docx(source, folder, month, signed, worker, director):
+def prepare_docx(source, folder, month, signed, worker, director, *, production=None):
     from docx.text.paragraph import Paragraph
     with tempfile.TemporaryDirectory() as tmp:
         temp = Path(tmp)
@@ -153,12 +181,13 @@ def prepare_docx(source, folder, month, signed, worker, director):
         paragraphs = [Paragraph(node, doc) for node in doc.element.body.xpath(".//w:p")]
         text = "\n".join(p.text for p in paragraphs)
         client = act_recipient(text)
-        rules = field_rules(month, signed, worker, director)
+        rules = field_rules(text, month, signed, worker, director, production)
         for pattern, value in rules:
             hits = 0
             for p in paragraphs:
-                for match in reversed(list(re.finditer(pattern, p.text, re.I))):
-                    replace_match(p, match, value)
+                for match in reversed(list(re.finditer(pattern, p.text, re.I | re.M))):
+                    if match[1] != value:
+                        replace_match(p, match, value)
                     hits += 1
             if not hits:
                 raise ValueError("Не найдено поле для замены: " + value)

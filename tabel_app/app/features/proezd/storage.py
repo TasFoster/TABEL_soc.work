@@ -71,6 +71,14 @@ def save_settings(obj):
     _core.save_json(FEATURE, "settings.json", obj)
 
 
+def save_series_price(series, price):
+    settings = load_settings()
+    prices = settings.setdefault("ticket_series_prices", {})
+    prices[series] = price
+    save_settings(settings)
+    return prices
+
+
 def template_path():
     return _core.template_path(FEATURE, _PKG, "proezd_template.ods")
 

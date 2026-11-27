@@ -9,6 +9,7 @@
 
 import calendar as _cal
 import datetime
+import math
 import re
 
 from . import parser, storage
@@ -31,7 +32,7 @@ def prepare(trips_path, scan_path=None):
     trips, header = parser.read_trips(trips_path)
     tickets = parser.ocr_tickets(scan_path) if scan_path else []
     return {"trips": trips, "header": header, "tickets": tickets,
-            "ocr_available": parser.ocr_available()}
+            "ocr_available": bool(scan_path) and parser.ocr_available()}
 
 
 # ------------------------------------------------------------- рабочие дни/даты
@@ -162,13 +163,32 @@ def normalize_series(raw, settings=None):
 
 
 def default_price_for(series, settings=None):
-    """Цена по префиксу серии (4МН->35, ВА->43), иначе default_price."""
+    """Цена полной серии, затем её префикса, затем цена по умолчанию."""
     settings = settings or storage.load_settings()
-    series = (series or "").strip().upper()
+    series = parser._norm_series(series or "")
+    exact = settings.get("ticket_series_prices", {})
+    if series in exact:
+        return exact[series]
     for prefix, val in settings.get("series_prices", {}).items():
-        if series.startswith(prefix.upper()):
+        if series.startswith(parser._norm_series(prefix)):
             return val
     return settings.get("default_price", 35)
+
+
+def parse_price(value):
+    amount = float(str(value).strip().replace(",", "."))
+    if not math.isfinite(amount) or amount < 0:
+        raise ValueError("Введите неотрицательную цену билета.")
+    return amount
+
+
+def remember_series_price(series, value, settings):
+    """Запомнить введённую цену для полной серии без подстановок OCR."""
+    key = parser._norm_series(series or "")
+    amount = parse_price(value)
+    if key:
+        settings["ticket_series_prices"] = storage.save_series_price(key, amount)
+    return amount
 
 
 # ----------------------------------------------------------------- строки таблицы
@@ -236,6 +256,7 @@ def build_lexicon(rows, settings=None):
             place.add(f.strip())
     for s in settings.get("known_series", []):
         series.add(str(s))
+    series.update(settings.get("ticket_series_prices", {}))
     return {"place": sorted(place), "purpose": sorted(purpose),
             "series": sorted(series), "number": sorted(number)}
 

@@ -4,6 +4,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import openpyxl
 import xlwt
@@ -13,6 +14,7 @@ from odf.text import P
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from app.features.proezd import service as travel
+from app.features.proezd import storage as travel_storage
 from app.features.uslugi_dengi import parser, service
 
 
@@ -21,6 +23,23 @@ class TravelAndServiceReportTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.folder = pathlib.Path(temp.name)
+
+    def test_travel_remembers_manual_prices_by_full_series(self):
+        with patch.object(travel_storage._core, "feature_data_dir", return_value=self.folder):
+            travel_storage.save_settings({
+                "series_prices": {"ВА": 43}, "default_price": 35, "custom_key": "сохранить",
+            })
+            settings = travel_storage.load_settings()
+            self.assertEqual(travel.remember_series_price(" ба – 996 ", "47,50", settings), 47.5)
+            self.assertEqual(travel.remember_series_price(" BA – 997 ", "0", settings), 0)
+            with self.assertRaises(ValueError):
+                travel.remember_series_price("ВА-997", "NaN", settings)
+            loaded = travel_storage.load_settings()
+            self.assertEqual(travel.default_price_for("БА-996", loaded), 47.5)
+            self.assertEqual(travel.default_price_for("ВА-997", loaded), 0)
+            self.assertEqual(travel.default_price_for("ВА-999", loaded), 43)
+            self.assertEqual(travel.default_price_for("БА-999", loaded), 35)
+            self.assertEqual(loaded["custom_key"], "сохранить")
 
     def test_travel_source_dates_from_ods_and_excel(self):
         date = datetime.date(2026, 11, 7)

@@ -11,6 +11,7 @@ import calendar as _cal
 import datetime
 import math
 import re
+from collections import defaultdict
 
 from . import parser, storage
 from .ods_writer import generate as _ods_generate
@@ -19,6 +20,15 @@ from .ods_writer import generate as _ods_generate
 # становится рабочей только по переносу — если она помечена как перенесённый
 # рабочий день в производственном календаре (work_days). См. travel_days().
 _WED = 2  # понедельник=0 … среда=2 (datetime.weekday)
+_VISIT_WEEKDAYS = (0, 1, 3, 4)
+_GROCERIES = "Покупка и доставка продуктов"
+_DELIVER_MEDICINE = "Доставка медикаментов"
+_WEEKLY_PURPOSES = (
+    ("Оплата коммунальных платежей",),
+    ("Оформление рецептов", _DELIVER_MEDICINE),
+    ("Получение подарка от спонсоров", "Доставка подарка от спонсоров"),
+)
+_ORDER_MEDICINE = ("Заказ медикаментов", _DELIVER_MEDICINE)
 
 # Колонки строки таблицы (логическая модель одной поездки).
 ROW_KEYS = ("num", "date", "frm", "to", "purpose", "number", "series", "price")
@@ -228,6 +238,79 @@ def reassign_dates(rows, year, month):
     """Пересчитать только даты у текущих (возможно отредактированных) строк по
     выбранному месяцу, сохраняя остальные колонки. Возвращает (rows, note)."""
     return assign_dates(rows, year, month, storage.load_calendar())
+
+
+def _monthly_visits(year, month):
+    """Назначить цели на плановые даты до учёта переносов."""
+    visits = {}
+    weeks = defaultdict(list)
+    for day in range(1, _cal.monthrange(year, month)[1] + 1):
+        date = datetime.date(year, month, day)
+        if date.weekday() in _VISIT_WEEKDAYS:
+            visits[date] = [_GROCERIES, _GROCERIES]
+            weeks[date.isocalendar()[:2]].append(date)
+
+    for dates in weeks.values():
+        for index, purposes in enumerate(_WEEKLY_PURPOSES):
+            visits[dates[min(index, len(dates) - 1)]].extend(purposes)
+
+    for first_half in (True, False):
+        dates = [date for date in visits if (date.day <= 15) == first_half]
+        order_date = next((date for date in dates if date.weekday() == 4), dates[0])
+        visits[order_date].extend(_ORDER_MEDICINE)
+    return visits
+
+
+def _previous_visit(date, cal):
+    """Сдвинуть нерабочую дату на ближайший разрешённый рабочий день назад."""
+    while date.weekday() not in _VISIT_WEEKDAYS or not cal.is_workday(date):
+        date -= datetime.timedelta(days=1)
+    return date
+
+
+def _purpose_key(purpose):
+    return " ".join(purpose.casefold().strip(" .").split()).replace("ё", "е")
+
+
+def build_monthly_rows(year, month, *, cal=None, settings=None, source_rows=()):
+    """Сформировать редактируемый график; переносить весь визит вместе с его целями."""
+    if cal is None:
+        cal = storage.load_calendar()
+    if settings is None:
+        settings = storage.load_settings()
+
+    routes = defaultdict(set)
+    for source in source_rows:
+        route = tuple(str(source.get(key) or "").strip() for key in ("frm", "to"))
+        if all(route):
+            routes[_purpose_key(source.get("purpose") or "")].add(route)
+
+    rows = []
+    moved = 0
+    outside_month = False
+    price = default_price_for("", settings)
+    for planned_date, purposes in _monthly_visits(year, month).items():
+        date = _previous_visit(planned_date, cal)
+        moved += date != planned_date
+        outside_month |= date.month != month
+        for purpose in purposes:
+            candidates = routes[_purpose_key(purpose)]
+            frm, to = next(iter(candidates)) if len(candidates) == 1 else ("", "")
+            rows.append({
+                "num": len(rows) + 1, "date": date.strftime("%d.%m.%Y"),
+                "frm": frm, "to": to, "purpose": purpose, "number": "", "series": "",
+                "price": price, "dop": purpose != _GROCERIES,
+            })
+
+    actual_days = len({row["date"] for row in rows})
+    note = f"По графику: {actual_days} дат, {len(rows)} поездок."
+    if moved:
+        note += f" Перенесено на предшествующие рабочие даты: {moved} визитов."
+    if outside_month:
+        note += " Есть даты предыдущего месяца из-за переноса в начале периода."
+    if not cal.has_year(year):
+        note += f" В производственном календаре нет данных за {year} год."
+    return rows, note
 
 
 # ----------------------------------------------------------------- лексикон подсказок

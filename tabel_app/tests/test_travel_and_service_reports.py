@@ -4,6 +4,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from unittest.mock import patch
 
 import openpyxl
@@ -15,6 +16,7 @@ from odf.text import P
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from app.features.proezd import service as travel
 from app.features.proezd import storage as travel_storage
+from app.features.timesheet.calendar_ru import ProductionCalendar
 from app.features.uslugi_dengi import parser, service
 
 
@@ -84,6 +86,68 @@ class TravelAndServiceReportTests(unittest.TestCase):
                 self.assertEqual([row['date'] for row in actual], ['07.11.2026', '07.11.2026', ''])
                 self.assertEqual(actual[1]['frm'], 'Пункт Б')
                 self.assertIn('Без даты: 1', note)
+
+    def test_travel_monthly_schedule_pairs_and_cadences(self):
+        cal = ProductionCalendar({'2026': {}})
+        rows, note = travel.build_monthly_rows(2026, 9, cal=cal, settings={'default_price': 35})
+        by_date = {}
+        for row in rows:
+            date = datetime.datetime.strptime(row['date'], '%d.%m.%Y').date()
+            self.assertEqual(date.month, 9)
+            self.assertIn(date.weekday(), (0, 1, 3, 4))
+            by_date.setdefault(date, Counter())[row['purpose']] += 1
+
+        self.assertEqual(len(by_date), 17)
+        self.assertEqual([row['num'] for row in rows], list(range(1, len(rows) + 1)))
+        for trips in by_date.values():
+            self.assertEqual(trips['Покупка и доставка продуктов'], 2)
+            self.assertEqual(trips['Получение подарка от спонсоров'],
+                             trips['Доставка подарка от спонсоров'])
+            self.assertEqual(trips['Оформление рецептов'] + trips['Заказ медикаментов'],
+                             trips['Доставка медикаментов'])
+        weekly = ('Оплата коммунальных платежей', 'Оформление рецептов',
+                  'Получение подарка от спонсоров')
+        weeks = {}
+        orders = []
+        for day, trips in by_date.items():
+            weeks.setdefault(day.isocalendar().week, Counter()).update(trips)
+            orders.extend([day.day] * trips['Заказ медикаментов'])
+        self.assertEqual(len(weeks), 5)
+        for counts in weeks.values():
+            self.assertEqual([counts[purpose] for purpose in weekly], [1, 1, 1])
+        self.assertEqual(orders, [4, 18])
+        self.assertIn('17 дат', note)
+
+    def test_travel_shift_preserves_trips_and_ignores_other_weekdays(self):
+        cal = ProductionCalendar({
+            '2026': {'holidays': ['09-01', '09-10', '09-11'], 'work_days': ['09-09', '09-12']},
+        })
+        source = [
+            {'purpose': ' Покупка и доставка продуктов. ', 'frm': 'А', 'to': 'Б',
+             'number': '0123', 'series': '4МН-575', 'date': '05.08.2026'},
+            {'purpose': 'Оплата коммунальных платежей', 'frm': 'Б', 'to': 'В'},
+            {'purpose': 'Оплата коммунальных платежей', 'frm': 'Б', 'to': 'Г'},
+        ]
+        settings = {'default_price': 35}
+        rows, note = travel.build_monthly_rows(2026, 9, cal=cal, settings=settings,
+                                               source_rows=source)
+        unshifted, _ = travel.build_monthly_rows(2026, 9, cal=ProductionCalendar({}),
+                                                 settings=settings)
+        self.assertEqual(Counter(row['purpose'] for row in rows),
+                         Counter(row['purpose'] for row in unshifted))
+        self.assertIn('3 визитов', note)
+        self.assertIn('предыдущего месяца', note)
+        self.assertEqual(rows[0]['date'], '31.08.2026')
+        self.assertEqual({row['date'] for row in rows} &
+                         {'01.09.2026', '09.09.2026', '10.09.2026', '11.09.2026', '12.09.2026'},
+                         set())
+        groceries = [row for row in rows if row['purpose'] == 'Покупка и доставка продуктов']
+        self.assertEqual(sum(row['date'] == '08.09.2026' for row in groceries), 6)
+        self.assertTrue(all((row['frm'], row['to']) == ('А', 'Б') for row in groceries))
+        self.assertTrue(all((row['number'], row['series']) == ('', '') for row in rows))
+        utilities = [row for row in rows if row['purpose'] == 'Оплата коммунальных платежей']
+        self.assertTrue(all((row['frm'], row['to']) == ('', '') for row in utilities))
+        self.assertEqual(source[0]['date'], '05.08.2026')
 
     def test_empty_quantities_block_does_not_read_money_as_quantities(self):
         source = self.folder / 'benefit.xlsx'

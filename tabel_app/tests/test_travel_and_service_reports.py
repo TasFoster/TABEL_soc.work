@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from collections import Counter
 from unittest.mock import patch
+from zipfile import ZipFile
+from xml.etree import ElementTree as ET
 
 import openpyxl
 import xlwt
@@ -17,6 +19,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from app.features.proezd import service as travel
 from app.features.proezd import storage as travel_storage
 from app.features.timesheet.calendar_ru import ProductionCalendar
+
+from app.features.proezd.ods_writer import APPL_SHEET, REPORT_SHEET
 from app.features.uslugi_dengi import parser, service
 
 
@@ -148,6 +152,63 @@ class TravelAndServiceReportTests(unittest.TestCase):
         utilities = [row for row in rows if row['purpose'] == 'Оплата коммунальных платежей']
         self.assertTrue(all((row['frm'], row['to']) == ('', '') for row in utilities))
         self.assertEqual(source[0]['date'], '05.08.2026')
+
+    def test_travel_export_replaces_full_size_tail_and_removes_backgrounds(self):
+        rows = [{'date': '02.11.2026', 'frm': 'Пункт А', 'to': 'Пункт Б',
+                 'purpose': '=работа с документами', 'number': '001234',
+                 'series': 'ВА-996', 'price': 43}] * 46
+        header = {'worker_full': 'Петрова Мария Ивановна'}
+        ods = self.folder / 'travel.ods'
+        xlsx = self.folder / 'travel.xlsx'
+        with patch.object(travel, 'update_lexicon'):
+            for target in (ods, xlsx):
+                travel.generate(rows, header, 2026, 11, target)
+
+        ns = {
+            'table': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
+            'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+            'style': 'urn:oasis:names:tc:opendocument:xmlns:style:1.0',
+            'fo': 'urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0',
+        }
+        with ZipFile(ods) as archive:
+            self.assertIsNone(archive.testzip())
+            content = ET.fromstring(archive.read('content.xml'))
+            styles = ET.fromstring(archive.read('styles.xml'))
+        for root in (content, styles):
+            for props in root.findall('.//style:table-cell-properties', ns):
+                self.assertNotIn(f'{{{ns["fo"]}}}background-color', props.attrib)
+        tables = content.findall('.//table:table', ns)
+        self.assertEqual([t.get(f'{{{ns["table"]}}}name') for t in tables],
+                         [REPORT_SHEET, APPL_SHEET])
+        for table, row_count, last_col in zip(tables, (58, 15), ('F', 'B')):
+            self.assertEqual(sum(int(r.get(f'{{{ns["table"]}}}number-rows-repeated', 1))
+                                 for r in table.findall('.//table:table-row', ns)), row_count)
+            self.assertTrue(table.get(f'{{{ns["table"]}}}print-ranges').endswith(f'.{last_col}{row_count}'))
+            for cell in table.findall('.//table:table-cell', ns):
+                if cell.get(f'{{{ns["office"]}}}value-type') == 'string':
+                    self.assertNotIn(f'{{{ns["office"]}}}date-value', cell.attrib)
+        trips, _ = travel.parser.read_trips(ods)
+        self.assertEqual([r['date'] for r in trips], [r['date'] for r in rows])
+        self.assertIn('1978,00', ''.join(tables[1].itertext()))
+
+        workbook = openpyxl.load_workbook(xlsx)
+        self.addCleanup(workbook.close)
+        self.assertEqual(workbook.sheetnames, [REPORT_SHEET, APPL_SHEET])
+        report, application = workbook.worksheets
+        self.assertEqual(report['F53'].value, '001234 ВА-996')
+        self.assertEqual(report['E53'].value, '=работа с документами')
+        self.assertEqual(report['E53'].data_type, 's')
+        self.assertEqual(report['B53'].value, '02.11.2026')
+        self.assertIn('1978,00', application['A9'].value)
+        for sheet, bounds, merge, orientation in (
+            (report, '$A$1:$F$58', 'A1:F1', 'landscape'),
+            (application, '$A$1:$B$15', 'A1:B1', 'portrait'),
+        ):
+            self.assertTrue(sheet.print_area.endswith(bounds))
+            self.assertIn(merge, sheet.merged_cells)
+            self.assertEqual(sheet.page_setup.orientation, orientation)
+            self.assertEqual(sheet.page_setup.fitToWidth, 1)
+            self.assertTrue(all(cell.fill.patternType is None for row in sheet for cell in row))
 
     def test_empty_quantities_block_does_not_read_money_as_quantities(self):
         source = self.folder / 'benefit.xlsx'

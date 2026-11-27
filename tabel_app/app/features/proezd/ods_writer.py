@@ -11,15 +11,21 @@
 """
 
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from odf.namespaces import FONS
 from odf.opendocument import load
+from odf.style import BackgroundImage, TableCellProperties
 from odf.table import Table
 
+from ...core.printing import remove_headers_footers
 from ..reestr import ods_build as ob
 from ..reestr.num2words_ru import int_in_words, rubles_kopecks_in_words
 
 REPORT_SHEET = "отчет_по_проезду"
 APPL_SHEET = "Заявление"
+APPL_PRINT_ROWS = 15
 
 # Столбцы листа «отчёт» (0-based)
 C_NUM, C_DATE, C_FROM, C_TO, C_PURPOSE, C_TICKET = 0, 1, 2, 3, 4, 5
@@ -58,7 +64,10 @@ def generate(template_path, out_path, ctx, rows, keep_open=False):
     """rows — список строк-поездок (dict с ключами num/date/frm/to/purpose/number/
     series/price), уже отредактированных пользователем. Сумма = Σ price."""
     template_path = os.path.abspath(template_path)
-    out_path = os.path.abspath(out_path)
+    out_path = Path(out_path).absolute()
+    extension = out_path.suffix.lower()
+    if extension not in {".ods", ".xlsx"}:
+        raise ProezdWriterError("Выберите формат файла .ods или .xlsx.")
     if not os.path.exists(template_path):
         raise ProezdWriterError(f"Не найден шаблон: {template_path}")
     if not rows:
@@ -71,15 +80,49 @@ def generate(template_path, out_path, ctx, rows, keep_open=False):
 
     total = sum(float(r.get("price") or 0) for r in rows)
 
-    _write_report(ot, ctx, rows)
+    report_print_rows = _write_report(ot, ctx, rows)
     _write_application(za, ctx, total)
 
-    if os.path.exists(out_path):
-        os.remove(out_path)
-    doc.save(out_path)
-    from ...core.printing import remove_headers_footers
-    remove_headers_footers(out_path)
-    return out_path
+    areas = ((ot, report_print_rows, 6), (za, APPL_PRINT_ROWS, 2))
+    with TemporaryDirectory(dir=out_path.parent) as temporary:
+        exported = Path(temporary) / out_path.name
+        if extension == ".ods":
+            for sheet, row_count, col_count in areas:
+                _set_print_area(sheet, row_count, col_count)
+            _remove_cell_backgrounds(doc)
+            doc.save(str(exported))
+            remove_headers_footers(exported)
+        else:
+            from .xlsx_writer import save_xlsx
+
+            save_xlsx(doc, areas, exported)
+        os.replace(exported, out_path)
+    return str(out_path)
+
+
+def _set_print_area(sheet, rows, columns):
+    name = sheet.getAttribute("name")
+    last_column = chr(ord("A") + columns - 1)
+    sheet.setAttribute("printranges", f"'{name}'.A1:'{name}'.{last_column}{rows}")
+    # Шаблон дополняет таблицу пустыми строками до лимита Excel. После
+    # добавления поездок этот хвост может сделать лист длиннее лимита.
+    for start, row, repeated in ob.logical_rows(sheet):
+        if start >= rows:
+            row.parentNode.removeChild(row)
+        elif start + repeated > rows:
+            row.setAttribute("numberrowsrepeated", str(rows - start))
+
+
+def _remove_cell_backgrounds(doc):
+    for props in doc.getElementsByType(TableCellProperties):
+        props.attributes.pop((FONS, "background-color"), None)
+        for background in props.getElementsByType(BackgroundImage):
+            props.removeChild(background)
+
+
+def _write_date(row, col, value):
+    cell = ob.put_row(row, {col: value})[col]
+    cell.attributes.pop((ob.OFFICENS, "date-value"), None)
 
 
 def _ticket_str(number, series):
@@ -121,12 +164,12 @@ def _write_report(ot, ctx, rows):
         r = ob.clone_row(proto)
         ob.put_row(r, {
             C_NUM: i,
-            C_DATE: row.get("date", ""),
             C_FROM: row.get("frm", ""),
             C_TO: row.get("to", ""),
             C_PURPOSE: row.get("purpose", ""),
             C_TICKET: _ticket_str(row.get("number", ""), row.get("series", "")),
         })
+        _write_date(r, C_DATE, row.get("date", ""))
         new_rows.append(r)
     ob.insert_rows_before(ot, new_rows, cnt_row)
 
@@ -135,11 +178,14 @@ def _write_report(ot, ctx, rows):
     _, sotr = _find_row(ot, lambda t: t.startswith("Сотрудник"))
     if sotr is not None:
         ob.put_row(sotr, {0: f"Сотрудник_______________/ {ctx['worker_short']}/"})
-    _, confirm = _find_row(ot, lambda t: t.startswith("Поездки, указанные"))
+    confirm_index, confirm = _find_row(ot, lambda t: t.startswith("Поездки, указанные"))
     if confirm is not None:
         ob.put_row(confirm, {0: "Поездки, указанные в маршрутном листе подтверждаю:"
                                 "___________________   /                    "
                                 f"{ctx['zav']}  /"})
+        return confirm_index + 2  # строка пояснения под подписью руководителя
+    total_index, _ = _find_row(ot, lambda t: t.startswith("Количество поездок"))
+    return total_index + 1
 
 
 def _write_application(za, ctx, total):
@@ -150,4 +196,4 @@ def _write_application(za, ctx, total):
         f"Прошу возместить мне расходы на проезд в служебных целях в сумме "
         f"{fmt_money(total)} ({rubles_kopecks_in_words(total)}) , "
         f"произведенные в {ctx['month_prep']} {ctx['year']} г."})
-    ob.put_row(ob.row_at(za, 13), {0: ctx["appl_date"]})
+    _write_date(ob.row_at(za, 13), 0, ctx["appl_date"])

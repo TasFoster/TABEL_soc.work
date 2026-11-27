@@ -103,7 +103,7 @@ def _selftest_pril():
 
 
 def _selftest_proezd():
-    """Самопроверка «Проезд»: поездки и билеты из шаблона-образца -> .ods."""
+    """Самопроверка «Проезд»: поездки из шаблона-образца -> .ods и .xlsx."""
     import traceback
 
     import datetime
@@ -122,11 +122,12 @@ def _selftest_proezd():
         ys = str(hdr.get("year", "")).strip()
         year = int(ys) if ys.isdigit() else today.year
         rows, note = service.build_rows(prepared, year, month, s)
-        out = os.path.join(base, "selftest_proezd.ods")
-        service.generate(rows, hdr, year, month, out)
+        outputs = [os.path.join(base, f"selftest_proezd.{ext}") for ext in ("ods", "xlsx")]
+        for out in outputs:
+            service.generate(rows, hdr, year, month, out)
         total = sum(r["price"] for r in rows)
         with open(log, "w", encoding="utf-8") as f:
-            f.write(f"OK {out}\nПоездок={len(rows)} сумма={total} "
+            f.write(f"OK {', '.join(outputs)}\nПоездок={len(rows)} сумма={total} "
                     f"OCR={'есть' if prepared['ocr_available'] else 'нет'}\n{note}")
     except Exception:
         with open(log, "w", encoding="utf-8") as f:
